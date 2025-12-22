@@ -2,7 +2,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-
+// max users in regisrty
 #define USER_COUNT 1
 
 // server object

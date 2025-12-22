@@ -59,7 +59,7 @@ struct Users load_users(){
     return users;
 }
 
-// responds to any request with fixed token "93g2tg40gb3088t0g4h4"
+// responds to any request with fixed token from get_token() function
 void launch(struct Server *server)
 {
     
@@ -117,6 +117,7 @@ char * get_token(char *username, char *password)
 int main(){
     // initialises server and opens server for connections
     struct Server server = server__constructor(AF_INET, 0, SOCK_STREAM, INADDR_ANY, PORT, 10, launch);
+    // initialises user registry with one user
     users = load_users();
     server.launch(&server);
     return 0;
