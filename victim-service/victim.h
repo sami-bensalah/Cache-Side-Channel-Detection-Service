@@ -44,3 +44,7 @@ struct Users load_users();
 // token generator functions
 int check(char *username, char *password);
 char * get_token(char *username, char *password);
+
+// HTTP related
+int get_POST_body(char *username, char *password, int *id, const char *buffer);
+void http_response(char *response, int response_size, int status_code, char *message);
