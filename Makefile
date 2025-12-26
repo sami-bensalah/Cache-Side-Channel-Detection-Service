@@ -1,8 +1,8 @@
 CC = gcc
 INCDIRS = -I.
 OPT = -O0 
-LIBS = -lcrypto
 CFLAGS = -Wall -Wextra -Wpedantic -g $(INCDIRS) $(OPT)
+LIBS = -lcrypto
 
 VICTIM_FILE = victim-service/victim.c 
 ATTACKER_FILE = attacker-spy-service/attacker-spy.c
@@ -10,7 +10,7 @@ CFILES = $(VICTIM_FILE) $(ATTACKER_FILE)
 
 V_OBJS = victim-service/victim.o
 A_OBJS = attacker-spy-service/attacker-spy.o
-OBJECTS = $(V_OBJS) $(A_OBJS)
+OBJECTS = $(V_OBJS) $(A_OBJS) 
 
 VICTIM_BIN = bin/victim-service
 ATTACKER_BIN = bin/attacker-spy-service
