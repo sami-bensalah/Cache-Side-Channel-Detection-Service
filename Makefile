@@ -1,6 +1,7 @@
 CC = gcc
 INCDIRS = -I.
 OPT = -O0 
+LIBS = -lcrypto
 CFLAGS = -Wall -Wextra -Wpedantic -g $(INCDIRS) $(OPT)
 
 VICTIM_FILE = victim-service/victim.c 
@@ -19,7 +20,7 @@ all: $(BINARY) # if i do make all the binary needs to be made first
 
 # links victim-service/victim.o into bin/victim_service
 $(VICTIM_BIN): $(V_OBJS)
-	$(CC) -o $@ $^ 
+	$(CC) -o $@ $^ $(LIBS)
 
 
 # links attacker-spy-service/attacker-spy.o into bin/attacker_spy

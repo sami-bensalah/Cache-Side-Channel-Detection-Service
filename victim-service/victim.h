@@ -4,6 +4,7 @@
 
 // max users in regisrty
 #define USER_COUNT 1
+#define ROLE_COUNT 5
 
 // server object
 struct Server
@@ -31,6 +32,15 @@ struct Users
 
 };
 
+// we will do role = roles[id] -> get secret byte
+// followed by a x = [role * 4096]
+struct RoleBinding role_binding;
+struct RoleBinding{
+    char *roles[ROLE_COUNT];
+
+};
+
+
 // initialises server_constructor
 struct Server server__constructor(int domain, int protocol, int type, 
     in_addr_t interface, 
@@ -43,8 +53,8 @@ struct Users load_users();
 
 // token generator functions
 int check(char *username, char *password);
-char * get_token(char *username, char *password);
-
+char * get_token(char *username, char *password, unsigned int user_id);
+void sign(char *username, unsigned int user_id, unsigned char *signature);
 // HTTP related
-int get_POST_body(char *username, char *password, int *id, const char *buffer);
+int get_POST_body(char *username, char *password, unsigned int *id, const char *buffer);
 void http_response(char *response, int response_size, int status_code, char *message);

@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <openssl/hmac.h>
 
 #include "victim.h"
 
@@ -79,11 +80,11 @@ void launch(struct Server *server)
 
         char username[USERNAME_MAX];
         char password[PASSWORD_MAX];
-        int user_id;
+        unsigned int user_id;
         // gets params from POST body and assigns to local vars
         int status = get_POST_body(username, password, &user_id, buffer);
         if (status > 0){
-            char *token = get_token(username, password);
+            char *token = get_token(username, password, user_id);
             http_response(response, RESPONSE_SIZE, 200, token);
         
             printf("Your user ID is: %d\n", user_id);
@@ -113,20 +114,40 @@ int check(char *username, char *password)
 }
 
 // will generate token using signing key and username
-const uint8_t SIGNING_KEY[KEY_SIZE];
-char * get_token(char *username, char *password)
+const uint8_t SIGNING_KEY[KEY_SIZE] = {0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1};
+char * get_token(char *username, char *password, unsigned int user_id)
 {
+    static char response[128];
+
     int result = check(username, password);
-    if (result == 1){
+    if (result == 1 && user_id < ROLE_COUNT){
         // get token
-        char *token = "you got the token\n";
-        return token;
+        unsigned char signature[EVP_MAX_MD_SIZE];
+        sign(username, user_id, signature);
+
+        for (int i = 0; i < 32; i++){
+            sprintf(&response[i * 2], "%02x", signature[i]);
+        }
+        response[64] = '\0';
+
+        return response;
     }
     return "wrong username or password\n";
+
+}
+
+void sign(char *username, unsigned int user_id, unsigned char *signature){
+    // create plaintext
+
+    unsigned int sig_len;
+    char plaintext[64]; // 16 chars MAX_USERNAME + 10 (ID) + 1 null - 64 for safety
+    snprintf(plaintext, sizeof(plaintext),  "%s%u", username, user_id);
+
+    HMAC(EVP_sha256(), SIGNING_KEY, KEY_SIZE, (const unsigned char *)plaintext, strlen(plaintext), signature, &sig_len);
 }
 
 
-int get_POST_body(char *username, char *password, int *id, const char *buffer)
+int get_POST_body(char *username, char *password, unsigned int *id, const char *buffer)
 {
     int found = 0;
 
@@ -187,7 +208,9 @@ void http_response(char *response, int response_size, int status_code, char *mes
     );
 }
 
-
+struct RoleBinding role_binding = {
+    .roles = {"guest", "user", "editor", "admin", "super"}
+};
 int main(){
     // initialises server and opens server for connections
     struct Server server = server__constructor(AF_INET, 0, SOCK_STREAM, INADDR_ANY, PORT, 10, launch);
