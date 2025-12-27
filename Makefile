@@ -16,7 +16,10 @@ VICTIM_BIN = bin/victim-service
 ATTACKER_BIN = bin/attacker-spy-service
 BINARY = $(VICTIM_BIN) $(ATTACKER_BIN)
 
-all: $(BINARY) # if i do make all the binary needs to be made first
+# executable binaries - make all, make victim, make attacker
+all: $(BINARY) 
+victim: $(VICTIM_BIN)
+attacker: $(ATTACKER_BIN)
 
 # links victim-service/victim.o into bin/victim_service
 $(VICTIM_BIN): $(V_OBJS)
