@@ -31,11 +31,10 @@ struct Users
 };
 extern struct Users users;
 
-// we will do role = roles[id] -> get secret byte
-// followed by a x = [role * 4096]
+// role store object
 struct RoleBinding{
     char *roles[ROLE_COUNT];
-    int role_usage[ROLE_COUNT * 4096];
+    int role_usage[ROLE_COUNT * 4096]; // used for telemetry
 };
 extern struct RoleBinding role_binding;
 

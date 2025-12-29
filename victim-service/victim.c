@@ -17,6 +17,14 @@
 #define USERNAME_MAX 16
 #define PASSWORD_MAX 32
 
+const uint8_t SIGNING_KEY[KEY_SIZE] = {0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1};
+
+struct Users users;
+struct RoleBinding role_binding = {
+    .roles = {"guest", "user", "editor", "admin", "super"}, 
+};
+
+
 struct Server server__constructor(int domain, int protocol, int type, in_addr_t interface, int port, int backlog, void(*launch)(struct Server *server))
 {
     struct Server server;
@@ -100,21 +108,7 @@ void launch(struct Server *server)
     }
 }
 
-// checks if username and password are correct
-struct Users users;
-int check(char *username, char *password)
-{
-    if (strcmp(username, users.users[0]) == 0){
-        if (strcmp(password, users.passwords[0]) == 0){
-            return 1;
-        }
-    }
-
-    return 0;
-}
-
-// will generate token using signing key and username
-const uint8_t SIGNING_KEY[KEY_SIZE] = {0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1};
+// generates response based on user credentials provided
 char * get_token(char *username, char *password, unsigned int user_id)
 {
     static char response[128];
@@ -144,6 +138,18 @@ char * get_token(char *username, char *password, unsigned int user_id)
 
 }
 
+// returns 1 if username + password correct
+int check(char *username, char *password)
+{
+    if (strcmp(username, users.users[0]) == 0){
+        if (strcmp(password, users.passwords[0]) == 0){
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// performs signature -> HMAC(SIGNING_KEY){username, role, timestamp}
 void sign(char *username, char *role, unsigned char *signature){
     // create plaintext
     unsigned int sig_len;
@@ -218,9 +224,8 @@ void http_response(char *response, int response_size, int status_code, char *mes
     );
 }
 
-struct RoleBinding role_binding = {
-    .roles = {"guest", "user", "editor", "admin", "super"}, 
-};
+
+
 int main(){
     // initialises server and opens server for connections
     struct Server server = server__constructor(AF_INET, 0, SOCK_STREAM, INADDR_ANY, PORT, 10, launch);
