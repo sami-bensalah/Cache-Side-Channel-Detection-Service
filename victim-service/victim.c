@@ -228,6 +228,7 @@ void http_response(char *response, int response_size, int status_code, char *mes
 
 int main(){
     // initialises server and opens server for connections
+    printf("memory address of first byte signing key: %p\n", &SIGNING_KEY[0]);
     struct Server server = server__constructor(AF_INET, 0, SOCK_STREAM, INADDR_ANY, PORT, 10, launch);
     // initialises user registry with one user
     users = load_users();
