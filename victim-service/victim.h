@@ -24,21 +24,20 @@ struct Server
 };
 
 // user password store object
-struct Users users;
 struct Users
 {
     const char *users[USER_COUNT];
     const char *passwords[USER_COUNT];
-
 };
+extern struct Users users;
 
 // we will do role = roles[id] -> get secret byte
 // followed by a x = [role * 4096]
-struct RoleBinding role_binding;
 struct RoleBinding{
     char *roles[ROLE_COUNT];
-
+    int role_usage[ROLE_COUNT * 4096];
 };
+extern struct RoleBinding role_binding;
 
 
 // initialises server_constructor

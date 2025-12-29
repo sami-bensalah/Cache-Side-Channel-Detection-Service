@@ -85,11 +85,10 @@ void launch(struct Server *server)
         // gets params from POST body and assigns to local vars
         int status = get_POST_body(username, password, &user_id, buffer);
         if (status > 0){
-            char *token = get_token(username, password, user_id);
-            http_response(response, RESPONSE_SIZE, 200, token);
+            // sends result from get_token function
+            char *data = get_token(username, password, user_id);
+            http_response(response, RESPONSE_SIZE, 200, data);
         
-            printf("Your user role is: %s\n", role_binding.roles[user_id]);
-            
         }
         else{
             // if POST request wrong
@@ -121,19 +120,24 @@ char * get_token(char *username, char *password, unsigned int user_id)
     static char response[128];
 
     int result = check(username, password);
-    if (result == 1 && user_id < ROLE_COUNT){
-        char *role = role_binding.roles[user_id];
 
+    // ===============  SPECTRE VULNERABILITY ===============
+    if (result == 1 && user_id < ROLE_COUNT){
+        
+        char *role = role_binding.roles[user_id];
+        role_binding.role_usage[user_id * 4096]++; // tracks role usage
+                
+    // ======================================================
+        printf("Your user role is: %s\n", role_binding.roles[user_id]);
         // get token
         unsigned char signature[EVP_MAX_MD_SIZE];
         sign(username, role, signature);
 
         // converts token byte sequence to hex
         for (int i = 0; i < 32; i++){
-            sprintf(&response[i * 2], "%02x", signature[i]);
+            sprintf(&response[i * 2], "%02x\n", signature[i]);
         }
-        response[64] = '\0';
-
+        response[65] = '\0';
         return response;
     }
     return "wrong username or password\n";
@@ -215,7 +219,7 @@ void http_response(char *response, int response_size, int status_code, char *mes
 }
 
 struct RoleBinding role_binding = {
-    .roles = {"guest", "user", "editor", "admin", "super"}
+    .roles = {"guest", "user", "editor", "admin", "super"}, 
 };
 int main(){
     // initialises server and opens server for connections
