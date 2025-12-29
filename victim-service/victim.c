@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <openssl/hmac.h>
+#include <sys/time.h>
 
 #include "victim.h"
 
@@ -87,7 +88,7 @@ void launch(struct Server *server)
             char *token = get_token(username, password, user_id);
             http_response(response, RESPONSE_SIZE, 200, token);
         
-            printf("Your user ID is: %d\n", user_id);
+            printf("Your user role is: %s\n", role_binding.roles[user_id]);
             
         }
         else{
@@ -121,10 +122,13 @@ char * get_token(char *username, char *password, unsigned int user_id)
 
     int result = check(username, password);
     if (result == 1 && user_id < ROLE_COUNT){
+        char *role = role_binding.roles[user_id];
+
         // get token
         unsigned char signature[EVP_MAX_MD_SIZE];
-        sign(username, user_id, signature);
+        sign(username, role, signature);
 
+        // converts token byte sequence to hex
         for (int i = 0; i < 32; i++){
             sprintf(&response[i * 2], "%02x", signature[i]);
         }
@@ -136,12 +140,14 @@ char * get_token(char *username, char *password, unsigned int user_id)
 
 }
 
-void sign(char *username, unsigned int user_id, unsigned char *signature){
+void sign(char *username, char *role, unsigned char *signature){
     // create plaintext
-
     unsigned int sig_len;
-    char plaintext[64]; // 16 chars MAX_USERNAME + 10 (ID) + 1 null - 64 for safety
-    snprintf(plaintext, sizeof(plaintext),  "%s%u", username, user_id);
+    char plaintext[64]; // 16 chars (MAX_USERNAME) + 10 (ID) + 8 (timestamp) + 1 (null) - 64 for safety
+    time_t currentTime;
+    time(&currentTime); // Get the current time
+
+    snprintf(plaintext, sizeof(plaintext),  "%s%s%s", username, role, ctime(&currentTime));
 
     HMAC(EVP_sha256(), SIGNING_KEY, KEY_SIZE, (const unsigned char *)plaintext, strlen(plaintext), signature, &sig_len);
 }
