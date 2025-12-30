@@ -17,14 +17,19 @@
 #define USERNAME_MAX 16
 #define PASSWORD_MAX 32
 
-const uint8_t SIGNING_KEY[KEY_SIZE] = {0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1};
+
 
 struct Users users;
-struct RoleBinding role_binding = {
-    .roles = {"guest", "user", "editor", "admin", "super"}, 
+// struct RoleBinding role_binding = {
+//     .roles = {"guest", "user", "editor", "admin", "super"}, 
+// };
+
+struct SharedMemory layout = {
+    .role_binding.roles = {"guest", "user", "editor", "admin", "super"},
+    .secret_key = {0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1}
 };
 
-
+ 
 struct Server server__constructor(int domain, int protocol, int type, in_addr_t interface, int port, int backlog, void(*launch)(struct Server *server))
 {
     struct Server server;
@@ -118,14 +123,14 @@ char * get_token(char *username, char *password, unsigned int user_id)
     // ===============  SPECTRE VULNERABILITY ===============
     if (result == 1 && user_id < ROLE_COUNT){
         
-        uint8_t *role_ptr = (uint8_t *)&role_binding.roles; // gets base address of roles array
+        uint8_t *role_ptr = (uint8_t *)&layout.role_binding.roles; // gets base address of roles array
 
         // * 4096 ensures each unqiue byte maps to unique cache set
-        role_binding.role_usage[role_ptr[user_id] * 4096]++; //role_ptr[user_id] gets byte at [role_ptr + user_id]
+        layout.role_binding.role_usage[role_ptr[user_id] * 4096]++; //role_ptr[user_id] gets byte at [role_ptr + user_id]
         
     // ======================================================
-        char *role = role_binding.roles[user_id];
-        printf("Your user role is: %s\n", role);
+        char *role = layout.role_binding.roles[user_id];
+        printf("This client's role is: %s (no. %d)\n ", role, layout.role_binding.role_usage[role_ptr[user_id] * 4096]);
         // get token
         unsigned char signature[EVP_MAX_MD_SIZE];
         sign(username, role, signature);
@@ -162,7 +167,7 @@ void sign(char *username, char *role, unsigned char *signature){
 
     snprintf(plaintext, sizeof(plaintext),  "%s%s%s", username, role, ctime(&currentTime));
 
-    HMAC(EVP_sha256(), SIGNING_KEY, KEY_SIZE, (const unsigned char *)plaintext, strlen(plaintext), signature, &sig_len);
+    HMAC(EVP_sha256(), layout.secret_key, KEY_SIZE, (const unsigned char *)plaintext, strlen(plaintext), signature, &sig_len);
 }
 
 
@@ -231,7 +236,8 @@ void http_response(char *response, int response_size, int status_code, char *mes
 
 int main(){
     // initialises server and opens server for connections
-    printf("memory address of first byte signing key: %p\n", &SIGNING_KEY[0]);
+    printf("memory address of first byte signing key: %p\n", &layout.secret_key[0]);
+    printf("memory address of start of roles array: %p\n", (void *)&layout.role_binding.roles[0]);
     struct Server server = server__constructor(AF_INET, 0, SOCK_STREAM, INADDR_ANY, PORT, 10, launch);
     // initialises user registry with one user
     users = load_users();
