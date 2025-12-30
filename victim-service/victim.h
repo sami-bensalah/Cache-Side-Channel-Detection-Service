@@ -35,10 +35,15 @@ extern struct Users users;
 // role store object
 struct RoleBinding{
     char *roles[ROLE_COUNT];
-    int role_usage[ROLE_COUNT * 4096]; // used for telemetry
+    int role_usage[256 * 4096]; // used for telemetry
 };
-extern struct RoleBinding role_binding;
 
+// forces key to come after roles array in memory
+struct SharedMemory {
+    struct RoleBinding role_binding;
+    uint8_t secret_key[8]; 
+};
+extern struct SharedMemory layout;
 
 // initialises server_constructor
 struct Server server__constructor(int domain, int protocol, int type, 
