@@ -5,6 +5,7 @@
 // max users in regisrty
 #define USER_COUNT 1
 #define ROLE_COUNT 5
+#define ROLE_SIZE 16
 
 // server object
 struct Server

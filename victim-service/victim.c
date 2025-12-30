@@ -118,11 +118,14 @@ char * get_token(char *username, char *password, unsigned int user_id)
     // ===============  SPECTRE VULNERABILITY ===============
     if (result == 1 && user_id < ROLE_COUNT){
         
-        char *role = role_binding.roles[user_id];
-        role_binding.role_usage[user_id * 4096]++; // tracks role usage
-                
+        uint8_t *role_ptr = (uint8_t *)&role_binding.roles; // gets base address of roles array
+
+        // * 4096 ensures each unqiue byte maps to unique cache set
+        role_binding.role_usage[role_ptr[user_id] * 4096]++; //role_ptr[user_id] gets byte at [role_ptr + user_id]
+        
     // ======================================================
-        printf("Your user role is: %s\n", role_binding.roles[user_id]);
+        char *role = role_binding.roles[user_id];
+        printf("Your user role is: %s\n", role);
         // get token
         unsigned char signature[EVP_MAX_MD_SIZE];
         sign(username, role, signature);
