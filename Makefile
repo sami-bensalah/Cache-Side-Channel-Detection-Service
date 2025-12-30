@@ -2,7 +2,7 @@ CC = gcc
 INCDIRS = -I.
 OPT = -O0 
 CFLAGS = -Wall -Wextra -Wpedantic -g $(INCDIRS) $(OPT)
-LIBS = -lcrypto
+LIBS = -lcrypto -lcurl
 
 VICTIM_FILE = victim-service/victim.c 
 ATTACKER_FILE = attacker-spy-service/attacker-spy.c
@@ -28,7 +28,7 @@ $(VICTIM_BIN): $(V_OBJS)
 
 # links attacker-spy-service/attacker-spy.o into bin/attacker_spy
 $(ATTACKER_BIN): $(A_OBJS)
-	$(CC) -o $@ $^ 
+	$(CC) -o $@ $^ $(LIBS)
 # takes @ = bin and ^ = test.o and does gcc -o bin test.o to generate binary from objects
 # binary generated can then be executed using ./bin
 
