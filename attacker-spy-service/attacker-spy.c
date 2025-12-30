@@ -11,6 +11,8 @@
 #define LINE_SIZE 64
 #define L1_SIZE (WAYS * SETS * LINE_SIZE)
 
+#define TRAINING_REPS 100
+
 // ADDRESS SECRET_KEY[0] -> 0x555555556008
 // avg cache fetch time = 30 cycles
 
@@ -36,7 +38,7 @@ void train_BP(){
         curl_easy_setopt(curl_handle, CURLOPT_URL, "http://127.0.0.1:8080/token-auth/");
         curl_easy_setopt(curl_handle, CURLOPT_POSTFIELDS, data);
 
-        for(int i = 0; i < 100; i++){
+        for(int i = 0; i < TRAINING_REPS; i++){
             curl_easy_perform(curl_handle);
         }
     }
