@@ -37,7 +37,9 @@ int main() {
     }
     
     // cache check 
+    bad_request();
     check_cache_presence();
+    
     return 0;
 }
 
@@ -60,20 +62,42 @@ void valid_request(){
 
 }
 
+void bad_request(){
+        CURL *curl_handle;
+    //CURLcode res;
+
+    curl_handle = curl_easy_init();
+    if (curl_handle){
+        char *data = "username=user1&password=password&id=800";
+
+        curl_easy_setopt(curl_handle, CURLOPT_URL, "http://127.0.0.1:8080/token-auth/");
+        curl_easy_setopt(curl_handle, CURLOPT_POSTFIELDS, data);
+
+        curl_easy_perform(curl_handle);
+    }
+}
+
 void check_cache_presence(){
     int present = 0;
     uint64_t t1, t2;
     unsigned int pid;
+    int missedIndex[100]  ={0, 0};
+    int x = 0;
     for (unsigned int i = 0; i < PROBE_ARR_SIZE; i+=INDEXES_PER_LINE){
             t1 = __rdtscp(&pid);
             probe_array[i] = 0;
             t2 = __rdtscp(&pid);
             if (t2 - t1 < 50){
                 present ++;
+                
+            }
+            else{
+                missedIndex[x] = present/8;
+                x++;
             }
         }
-
-    printf("%d/%d cache hits\n", present, NO_LINES);
+    
+    printf("%d/%d cache hits\n Missed Sets: %d & %d\n", present, NO_LINES, missedIndex[0], missedIndex[1]);
 }
 
 void cache_Measurement(){
