@@ -23,7 +23,9 @@ CURL *curl_handle;
 
 
 int main(int argc, char* argv[]) {
-    // prep data for request
+    cache_threshold();
+
+    // prep attack and training data for request
     char* attack_id = "2";
     if (argc == 2){
         attack_id = argv[1]; 
@@ -41,7 +43,7 @@ int main(int argc, char* argv[]) {
     }
 
 
-    int count[SETS] = {0}; // for recording sets that have been touched
+    int count[SETS] = {0}; // records sets that have been touched
     
     int loops = 10;
     while (loops > 0){
@@ -80,14 +82,6 @@ int main(int argc, char* argv[]) {
 }
 
 
-// send request with curl request for token to microservice
-void make_request(char *data){
-    curl_easy_setopt(curl_handle, CURLOPT_POSTFIELDS, data);
-    curl_easy_perform(curl_handle); 
-}
-
-
-
 void check_cache_presence(int *count){
     int present = 0;
     uint64_t t1, t2;
@@ -114,6 +108,53 @@ void check_cache_presence(int *count){
         }
     
     // printf("%d/%d cache hits\n", present, NO_LINES);
+}
+
+// finds hit and miss time  -need to implement loop to find avg + determine cache threshold
+volatile int test_data = 2;
+void cache_threshold(){
+    uint64_t t1, t2;
+    unsigned int pid;
+    volatile int junk; 
+
+    junk = test_data;
+    junk = test_data;
+
+    _mm_lfence();
+    t1 = __rdtscp(&pid);
+    _mm_lfence();
+
+    pid = test_data;
+
+    _mm_lfence();
+    t2 = __rdtscp(&pid);
+    _mm_lfence();
+
+    uint64_t time = t2 - t1;
+    printf("hit Time: %ld, %d\n", time, junk);
+
+    _mm_clflush((void*)&test_data);
+    _mm_mfence();
+
+    _mm_lfence();
+    t1 = __rdtscp(&pid);
+    _mm_lfence();
+
+    pid = test_data;
+
+    _mm_lfence();
+    t2 = __rdtscp(&pid);
+    _mm_lfence();
+
+    time = t2 - t1;
+    printf("miss Time: %ld\n", time, junk);
+}
+
+
+// send request with curl request for token to microservice
+void make_request(char *data){
+    curl_easy_setopt(curl_handle, CURLOPT_POSTFIELDS, data);
+    curl_easy_perform(curl_handle); 
 }
 
 // returns junk so that curl doesnt write to console
