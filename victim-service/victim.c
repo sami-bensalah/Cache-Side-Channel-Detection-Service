@@ -239,6 +239,7 @@ int main(){
     printf("memory address of first byte signing key: %p\n", &layout.secret_key[0]);
     printf("memory address of start of roles array: %p\n", (void *)&layout.role_binding.roles[0]);
     printf("memory address of start of role_usage array: %p\n", (void *)&layout.role_binding.role_usage[0]);
+    printf("\nSigning Key Address in Dec: %lu \nRole usage array Address in Dec: %lu\nDiff: %lu\n\n", (unsigned long)&layout.secret_key[0], (unsigned long)&layout.role_binding.role_usage[0], ((unsigned long)&layout.secret_key[0]-(unsigned long)&layout.role_binding.role_usage[0]));
     struct Server server = server__constructor(AF_INET, 0, SOCK_STREAM, INADDR_ANY, PORT, 10, launch);
     // initialises user registry with one user
     users = load_users();
