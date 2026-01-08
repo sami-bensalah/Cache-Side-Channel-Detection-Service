@@ -34,8 +34,9 @@ extern struct Users users;
 
 // role store object
 struct RoleBinding{
-    char *roles[ROLE_COUNT];
-    int role_usage[256 * 4096]; // used for telemetry
+    // both byte aligned to ensure that set mapping is reliable
+    char *roles[ROLE_COUNT] __attribute__((aligned(4096)));
+    int role_usage[256 * 4096] __attribute__((aligned(4096))); // used for telemetry
 };
 
 // forces key to come after roles array in memory
