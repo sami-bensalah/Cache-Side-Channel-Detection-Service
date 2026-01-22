@@ -1,6 +1,9 @@
-void cache_Measurement();
+void cache_Measurement(void);
 void check_cache_presence(int *count);
 size_t write_junk(void *buffer, size_t size, size_t nmemb, void *userp);
 void make_request(char *data);
-uint64_t cache_threshold();
-void prime_cache();
+void cache_threshold(void);
+void prime_cache(void);
+void get_inputs(char attack_data[], int argc, char* argv[]);
+void invalid_request_baseline(int invalid_baseline[]);
+void setup_linked_lists(void);
