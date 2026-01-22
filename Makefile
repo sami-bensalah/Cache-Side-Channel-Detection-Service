@@ -1,7 +1,7 @@
 CC = gcc
 INCDIRS = -I.
 OPT = -O0 
-CFLAGS = -Wall -Wextra -Wpedantic -g $(INCDIRS) $(OPT)
+CFLAGS = -Wall -Wextra -Wpedantic -g $(INCDIRS) $(OPT) -march=native
 LIBS = -lcrypto -lcurl
 
 VICTIM_FILE = victim-service/victim.c 
