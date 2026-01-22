@@ -36,13 +36,15 @@ extern struct Users users;
 struct RoleBinding{
     // both byte aligned to ensure that set mapping is reliable
     char *roles[ROLE_COUNT] __attribute__((aligned(4096)));
-    int role_usage[256 * 4096] __attribute__((aligned(4096))); // used for telemetry
+    volatile size_t role_count;
+  
 };
 
 // forces key to come after roles array in memory
 struct SharedMemory {
     struct RoleBinding role_binding;
     uint8_t secret_key[8]; 
+    uint8_t role_usage[256 * 4096] __attribute__((aligned(4096))); // used for telemetry
 };
 extern struct SharedMemory layout;
 
@@ -64,3 +66,5 @@ void sign(char *username, char *role, unsigned char *signature);
 // HTTP related
 int get_POST_body(char *username, char *password, unsigned int *id, const char *buffer);
 void http_response(char *response, int response_size, int status_code, char *message);
+
+int calc_set(uint8_t *role_ptr);

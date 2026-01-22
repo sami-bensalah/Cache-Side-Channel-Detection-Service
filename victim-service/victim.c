@@ -7,6 +7,8 @@
 #include <netinet/in.h>
 #include <openssl/hmac.h>
 #include <sys/time.h>
+#include <stdint.h>
+#include <x86intrin.h>
 
 #include "victim.h"
 
@@ -16,20 +18,48 @@
 #define KEY_SIZE 8
 #define USERNAME_MAX 16
 #define PASSWORD_MAX 32
+#define CACHE_STRIDE 1040
 
-
+int attack_id = ((unsigned long)&layout.secret_key[0]-(unsigned long)&layout.role_binding.roles[0]);
 
 struct Users users;
-// struct RoleBinding role_binding = {
-//     .roles = {"guest", "user", "editor", "admin", "super"}, 
-// };
 
 struct SharedMemory layout = {
     .role_binding.roles = {"guest", "user", "editor", "admin", "super"},
-    .secret_key = {0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1}
+    .role_binding.role_count = ROLE_COUNT,
+    .secret_key = {0x91, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80}
 };
 
- 
+
+uint8_t *role_ptr;
+
+int main(){
+    // prints target byte that correct attack_id will speculativly load
+    role_ptr = (uint8_t *)&layout.role_binding.roles; // gets base address of roles array first byte
+    printf("LEAKED BYTE: 0x%x, Memory Address: %p -> Set %d\n", role_ptr[attack_id], &layout.role_usage[role_ptr[attack_id] * CACHE_STRIDE], calc_set(role_ptr));
+    
+    // mem address and attack id info
+    printf("memory address of first byte signing key: %p\n", &layout.secret_key[0]);
+    printf("memory address of start of roles array: %p\n", (void *)&layout.role_binding.roles[0]);
+    printf("memory address of start of role_usage array: %p\n", (void *)&layout.role_usage[0]);
+    printf("\nSigning Key Address in Dec: %lu \nRoles array Address in Dec: %lu\nDiff: %lu\n\n", (unsigned long)&layout.secret_key[0], (unsigned long)&layout.role_binding.roles[0], ((unsigned long)&layout.secret_key[0]-(unsigned long)&layout.role_binding.roles[0]));
+    
+    // initialises server and opens server for connections
+    struct Server server = server__constructor(AF_INET, 0, SOCK_STREAM, INADDR_ANY, PORT, 10, launch);
+    // initialises user registry with one user
+    users = load_users();
+    server.launch(&server);
+    return 0;
+}
+
+int calc_set(uint8_t *role_ptr){
+    uint8_t byte = role_ptr[attack_id];
+    uintptr_t address = (uintptr_t)&layout.role_usage[byte * CACHE_STRIDE]; // get mem address it will map to 
+
+    int set = (address >> 6) & 0x3F;
+    return set;
+}
+
 struct Server server__constructor(int domain, int protocol, int type, in_addr_t interface, int port, int backlog, void(*launch)(struct Server *server))
 {
     struct Server server;
@@ -121,16 +151,19 @@ char * get_token(char *username, char *password, unsigned int user_id)
     int result = check(username, password);
 
     // ===============  SPECTRE VULNERABILITY ===============
-    if (result == 1 && user_id < ROLE_COUNT){
-        
-        uint8_t *role_ptr = (uint8_t *)&layout.role_binding.roles; // gets base address of roles array
+    _mm_clflush((void*)&layout.role_binding.role_count);
+    _mm_mfence();
 
-        // * 4096 ensures each unqiue byte maps to unique cache set
-        layout.role_binding.role_usage[role_ptr[user_id] * 4096]++; //role_ptr[user_id] gets byte at [role_ptr + user_id]
+    if(user_id < layout.role_binding.role_count && result == 1){
+        
+        // * CACHE_STRIDE ensures each unqiue byte maps to unique cache set
+        volatile uint8_t temp = layout.role_usage[role_ptr[user_id] * CACHE_STRIDE];
         
     // ======================================================
+        temp = temp + 1;
         char *role = layout.role_binding.roles[user_id];
-        printf("This client's role is: %s (no. %d)\n ", role, layout.role_binding.role_usage[role_ptr[user_id] * 4096]);
+ 
+
         // get token
         unsigned char signature[EVP_MAX_MD_SIZE];
         sign(username, role, signature);
@@ -233,16 +266,3 @@ void http_response(char *response, int response_size, int status_code, char *mes
 }
 
 
-
-int main(){
-    // initialises server and opens server for connections
-    printf("memory address of first byte signing key: %p\n", &layout.secret_key[0]);
-    printf("memory address of start of roles array: %p\n", (void *)&layout.role_binding.roles[0]);
-    printf("memory address of start of role_usage array: %p\n", (void *)&layout.role_binding.role_usage[0]);
-    printf("\nSigning Key Address in Dec: %lu \nRole usage array Address in Dec: %lu\nDiff: %lu\n\n", (unsigned long)&layout.secret_key[0], (unsigned long)&layout.role_binding.role_usage[0], ((unsigned long)&layout.secret_key[0]-(unsigned long)&layout.role_binding.role_usage[0]));
-    struct Server server = server__constructor(AF_INET, 0, SOCK_STREAM, INADDR_ANY, PORT, 10, launch);
-    // initialises user registry with one user
-    users = load_users();
-    server.launch(&server);
-    return 0;
-}
