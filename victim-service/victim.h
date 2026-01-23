@@ -67,4 +67,4 @@ void sign(char *username, char *role, unsigned char *signature);
 int get_POST_body(char *username, char *password, unsigned int *id, const char *buffer);
 void http_response(char *response, int response_size, int status_code, char *message);
 
-int calc_set(uint8_t *role_ptr);
+void calc_set();

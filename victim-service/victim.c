@@ -31,12 +31,11 @@ struct SharedMemory layout = {
 };
 
 
-uint8_t *role_ptr;
+
 
 int main(){
-    // prints target byte that correct attack_id will speculativly load
-    role_ptr = (uint8_t *)&layout.role_binding.roles; // gets base address of roles array first byte
-    printf("LEAKED BYTE: 0x%x, Memory Address: %p -> Set %d\n", role_ptr[attack_id], &layout.role_usage[role_ptr[attack_id] * CACHE_STRIDE], calc_set(role_ptr));
+    // tests perfect attack id and returns set association
+    calc_set();
     
     // mem address and attack id info
     printf("memory address of first byte signing key: %p\n", &layout.secret_key[0]);
@@ -52,12 +51,16 @@ int main(){
     return 0;
 }
 
-int calc_set(uint8_t *role_ptr){
+void calc_set(){
+    uint8_t *role_ptr = (uint8_t *)&layout.role_binding.roles[0];
     uint8_t byte = role_ptr[attack_id];
     uintptr_t address = (uintptr_t)&layout.role_usage[byte * CACHE_STRIDE]; // get mem address it will map to 
 
     int set = (address >> 6) & 0x3F;
-    return set;
+
+    // prints target byte that correct attack_id will speculativly load
+    printf("LEAKED BYTE: 0x%x, Memory Address: %p -> Set %d\n", role_ptr[attack_id], &layout.role_usage[role_ptr[attack_id] * CACHE_STRIDE], set);
+
 }
 
 struct Server server__constructor(int domain, int protocol, int type, in_addr_t interface, int port, int backlog, void(*launch)(struct Server *server))
@@ -149,10 +152,13 @@ char * get_token(char *username, char *password, unsigned int user_id)
     static char response[128];
 
     int result = check(username, password);
-
+    uint8_t *role_ptr = (uint8_t *)&layout.role_binding.roles[0]; // gets base address of roles array first byte
     // ===============  SPECTRE VULNERABILITY ===============
-    _mm_clflush((void*)&layout.role_binding.role_count);
+    _mm_clflush((void*)&layout.role_binding.role_count); // force speculation, needs to fetch from mem
     _mm_mfence();
+
+    for (volatile int i = 0; i < 100; i++) {
+    }
 
     if(user_id < layout.role_binding.role_count && result == 1){
         
@@ -163,7 +169,6 @@ char * get_token(char *username, char *password, unsigned int user_id)
         temp = temp + 1;
         char *role = layout.role_binding.roles[user_id];
  
-
         // get token
         unsigned char signature[EVP_MAX_MD_SIZE];
         sign(username, role, signature);
