@@ -7,3 +7,4 @@ void prime_cache(void);
 void get_inputs(char attack_data[], int argc, char* argv[]);
 void invalid_request_baseline(int invalid_baseline[]);
 void setup_linked_lists(void);
+void shuffle(int shuffle_arr[]);
