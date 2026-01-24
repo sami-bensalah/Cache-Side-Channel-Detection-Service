@@ -10,5 +10,5 @@ void get_inputs(char attack_data[], int argc, char* argv[]);
 void invalid_request_baseline(int invalid_baseline[]);
 void setup_linked_lists(void);
 void shuffle(int shuffle_arr[]);
-
+void primeprobe(char *data, int *clientfd, int *results);
 void open_socket(int *clientfd, struct sockaddr_in *servaddr);
