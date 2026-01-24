@@ -26,7 +26,7 @@ int shuffle_arr[SETS];
 int main(int argc, char* argv[]) {
     // shuffle prob arr access route - avoid hardwre prefetching
     for (int i = 0; i < SETS; i++) {
-        shuffle_arr[i] = i;
+        shuffle_arr[i] = i; // shuffle_arr = {0-63}
     }
     shuffle(shuffle_arr);
 
@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
         check_cache_presence(baseline);
     }
 
-    int count[SETS] = {0}; // records sets that have been touched
+    //int count[SETS] = {0}; // records sets that have been touched
     for (int j = 0; j < ATTACK_RUNS; j++) {
 
         
@@ -131,11 +131,12 @@ void shuffle(int shuffle_arr[]){
 
 void prime_cache(){
     // Prime L1 cache
-    // just need to hit each cache line once (so will skip indexes on the same line)
-    for (int j = 0; j < 12; j++){
+    for (int j = 0; j < 10; j++){
         // loop through probe array - one iteration = one cache line hit (makes sure it persists in L1)
-        for (unsigned int i = 0; i < SETS; i+=1){
-            probe_array[shuffle_arr[i] * LINE_SIZE] = 0;
+        for (unsigned int i = 0; i < SETS; i++){
+            for(unsigned int w = 0; w < WAYS; w++){ // primes each way
+                probe_array[shuffle_arr[i] * LINE_SIZE + (w * 4096)] = 0;
+            }
         }
     }
 }
@@ -144,9 +145,11 @@ void prime_cache(){
 void check_cache_presence(int *count){
     uint64_t t1, t2;
     unsigned int pid;
-    for (unsigned int i = 0; i < SETS; i+=1){
-            int index = shuffle_arr[i];
-            uint8_t *addr = &probe_array[index * LINE_SIZE];
+    for (unsigned int i = 0; i < SETS; i++){
+        int set = shuffle_arr[i]; // determine random set to probe
+        
+        for (int w = 0; w < WAYS; w ++){
+            uint8_t *addr = &probe_array[(set * LINE_SIZE) + (w * 4096)];
 
             _mm_lfence();
             t1 = __rdtscp(&pid);
@@ -157,11 +160,14 @@ void check_cache_presence(int *count){
             _mm_lfence();
             t2 = __rdtscp(&pid);
             _mm_lfence();
-            
-            if (t2 - t1 > c_threshold){
-               count[index] ++;
+                
+            if (t2 - t1 > c_threshold){ // if way evicted count one set eviction and move onto next set
+                count[set] ++;
+                break;
             }
         }
+        
+    }
     
     // printf("%d/%d cache hits\n", present, NO_LINES);
 }
