@@ -18,7 +18,7 @@
 #define KEY_SIZE 8
 #define USERNAME_MAX 16
 #define PASSWORD_MAX 32
-#define CACHE_STRIDE 1040
+#define CACHE_STRIDE 64
 
 int attack_id = ((unsigned long)&layout.secret_key[0]-(unsigned long)&layout.role_binding.roles[0]);
 
@@ -27,7 +27,7 @@ struct Users users;
 struct SharedMemory layout = {
     .role_binding.roles = {"guest", "user", "editor", "admin", "super"},
     .role_binding.role_count = ROLE_COUNT,
-    .secret_key = {0x91, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80}
+    .secret_key = {0x21, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80}
 };
 
 
@@ -35,7 +35,7 @@ struct SharedMemory layout = {
 
 int main(){
     // tests perfect attack id and returns set association
-    calc_set();
+    //calc_set();
     
     // mem address and attack id info
     printf("memory address of first byte signing key: %p\n", &layout.secret_key[0]);
@@ -117,31 +117,42 @@ void launch(struct Server *server)
     int address_length = sizeof(server->address);
     while(1){
         
-        char buffer[BUFFER_SIZE] = {0};
-        char response[RESPONSE_SIZE];
+
         printf("\n========== WAITING FOR CONNECTION ==========\n");
         //fflush(stdout);
         int new_socket = accept(server->socket, (struct sockaddr *)&server->address, (socklen_t *)&address_length);
-        read(new_socket, buffer, BUFFER_SIZE);
-        printf("%s\n", buffer);
 
-        char username[USERNAME_MAX];
-        char password[PASSWORD_MAX];
-        unsigned int user_id;
-        // gets params from POST body and assigns to local vars
-        int status = get_POST_body(username, password, &user_id, buffer);
-        if (status > 0){
-            // sends result from get_token function
-            char *data = get_token(username, password, user_id);
-            http_response(response, RESPONSE_SIZE, 200, data);
-        
-        }
-        else{
-            // if POST request wrong
-            http_response(response, RESPONSE_SIZE, 400, "Malformed POST request");
-        }
+        while(1){
+            char buffer[BUFFER_SIZE] = {0};
+            char response[RESPONSE_SIZE];
 
-        write(new_socket, response, strlen(response));
+            int noBytes = read(new_socket, buffer, BUFFER_SIZE);
+            if (noBytes < 1){
+                printf("\n========== CLIENT DISCONNECTED ==========\n");
+                break;
+            }
+
+            printf("\n========== NEW REQUEST ==========\n");
+            printf("%s\n", buffer);
+
+            char username[USERNAME_MAX];
+            char password[PASSWORD_MAX];
+            unsigned int user_id;
+            // gets params from POST body and assigns to local vars
+            int status = get_POST_body(username, password, &user_id, buffer);
+            if (status > 0){
+                // sends result from get_token function
+                char *data = get_token(username, password, user_id);
+                http_response(response, RESPONSE_SIZE, 200, data);
+            
+            }
+            else{
+                // if POST request wrong
+                http_response(response, RESPONSE_SIZE, 400, "Malformed POST request");
+            }
+
+            write(new_socket, response, strlen(response));
+        }
         close(new_socket);
     }
 }
@@ -153,6 +164,7 @@ char * get_token(char *username, char *password, unsigned int user_id)
 
     int result = check(username, password);
     uint8_t *role_ptr = (uint8_t *)&layout.role_binding.roles[0]; // gets base address of roles array first byte
+
     // ===============  SPECTRE VULNERABILITY ===============
     _mm_clflush((void*)&layout.role_binding.role_count); // force speculation, needs to fetch from mem
     _mm_mfence();
@@ -260,7 +272,7 @@ void http_response(char *response, int response_size, int status_code, char *mes
         "HTTP/1.1 %d %s\r\n"
         "Content-Type: text/plain\r\n"
         "Content-Length: %zu\r\n"
-        "Connection: close\r\n"
+        "Connection: keep-alive\r\n"
         "\r\n"
         "%s",
         status_code,
