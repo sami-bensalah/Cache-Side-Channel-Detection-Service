@@ -25,17 +25,15 @@ int attack_id = ((unsigned long)&layout.secret_key[0]-(unsigned long)&layout.rol
 struct Users users;
 
 struct SharedMemory layout = {
-    .role_binding.roles = {"guest", "user", "editor", "admin", "super"},
+    //.role_binding.roles = {"guest", "user", "editor", "admin", "super"},
     .role_binding.role_count = ROLE_COUNT,
-    .secret_key = {0x21, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80}
+    .secret_key = {0x43, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80}
 };
 
 
-
-
 int main(){
-    // tests perfect attack id and returns set association
-    //calc_set();
+    // tests attack id and returns set association
+    calc_set();
     
     // mem address and attack id info
     printf("memory address of first byte signing key: %p\n", &layout.secret_key[0]);
@@ -53,7 +51,7 @@ int main(){
 
 void calc_set(){
     uint8_t *role_ptr = (uint8_t *)&layout.role_binding.roles[0];
-    uint8_t byte = role_ptr[attack_id];
+    uint8_t byte = layout.role_binding.roles[attack_id];//role_ptr[attack_id];
     uintptr_t address = (uintptr_t)&layout.role_usage[byte * CACHE_STRIDE]; // get mem address it will map to 
 
     int set = (address >> 6) & 0x3F;
@@ -163,23 +161,22 @@ char * get_token(char *username, char *password, unsigned int user_id)
     static char response[128];
 
     int result = check(username, password);
-    uint8_t *role_ptr = (uint8_t *)&layout.role_binding.roles[0]; // gets base address of roles array first byte
+    //uint8_t *role_ptr = (uint8_t *)&layout.role_binding.roles[0]; // gets base address of roles array first byte
 
     // ===============  SPECTRE VULNERABILITY ===============
     _mm_clflush((void*)&layout.role_binding.role_count); // force speculation, needs to fetch from mem
     _mm_mfence();
 
-    for (volatile int i = 0; i < 100; i++) {
-    }
+    for (volatile int i = 0; i < 100; i++) {}
 
     if(user_id < layout.role_binding.role_count && result == 1){
         
         // * CACHE_STRIDE ensures each unqiue byte maps to unique cache set
-        volatile uint8_t temp = layout.role_usage[role_ptr[user_id] * CACHE_STRIDE];
-        
+        //volatile uint8_t temp = layout.role_usage[role_ptr[user_id] * CACHE_STRIDE];
+        volatile uint8_t temp = layout.role_usage[layout.role_binding.roles[user_id] * CACHE_STRIDE];
     // ======================================================
         temp = temp + 1;
-        char *role = layout.role_binding.roles[user_id];
+        uint8_t role = layout.role_binding.roles[user_id];
  
         // get token
         unsigned char signature[EVP_MAX_MD_SIZE];
@@ -208,14 +205,14 @@ int check(char *username, char *password)
 }
 
 // performs signature -> HMAC(SIGNING_KEY){username, role, timestamp}
-void sign(char *username, char *role, unsigned char *signature){
+void sign(char *username, uint8_t role, unsigned char *signature){
     // create plaintext
     unsigned int sig_len;
     char plaintext[64]; // 16 chars (MAX_USERNAME) + 10 (ID) + 8 (timestamp) + 1 (null) - 64 for safety
     time_t currentTime;
     time(&currentTime); // Get the current time
 
-    snprintf(plaintext, sizeof(plaintext),  "%s%s%s", username, role, ctime(&currentTime));
+    snprintf(plaintext, sizeof(plaintext),  "%s%x%s", username, role, ctime(&currentTime));
 
     HMAC(EVP_sha256(), layout.secret_key, KEY_SIZE, (const unsigned char *)plaintext, strlen(plaintext), signature, &sig_len);
 }

@@ -35,7 +35,7 @@ extern struct Users users;
 // role store object
 struct RoleBinding{
     // both byte aligned to ensure that set mapping is reliable
-    char *roles[ROLE_COUNT] __attribute__((aligned(4096)));
+    uint8_t roles[ROLE_COUNT] __attribute__((aligned(4096)));
     volatile size_t role_count;
   
 };
@@ -45,7 +45,7 @@ struct SharedMemory {
     struct RoleBinding role_binding;
     uint8_t secret_key[8]; 
     uint8_t role_usage[256 * 4096] __attribute__((aligned(4096))); // used for telemetry
-};
+}__attribute__((packed)); // makes sure compiler doesnt add padding
 extern struct SharedMemory layout;
 
 // initialises server_constructor
@@ -61,7 +61,7 @@ struct Users load_users();
 // token generator functions
 int check(char *username, char *password);
 char * get_token(char *username, char *password, unsigned int user_id);
-void sign(char *username, char *role, unsigned char *signature);
+void sign(char *username,  uint8_t role, unsigned char *signature);
 
 // HTTP related
 int get_POST_body(char *username, char *password, unsigned int *id, const char *buffer);
