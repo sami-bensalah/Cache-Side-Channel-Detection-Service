@@ -26,7 +26,7 @@ struct Users users;
 
 struct SharedMemory layout = {
     //.role_binding.roles = {"guest", "user", "editor", "admin", "super"},
-    .role_binding.role_count = ROLE_COUNT,
+    .role_binding.role_count = ROLE_COUNT, // = 5,
     .secret_key = {0x43, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80}
 };
 
@@ -34,7 +34,8 @@ struct SharedMemory layout = {
 int main(){
     // tests attack id and returns set association
     calc_set();
-    
+    // forces role_usage array to exist in RAM
+    memset(layout.role_usage, 1, sizeof(layout.role_usage));
     // mem address and attack id info
     printf("memory address of first byte signing key: %p\n", &layout.secret_key[0]);
     printf("memory address of start of roles array: %p\n", (void *)&layout.role_binding.roles[0]);
@@ -113,6 +114,11 @@ void launch(struct Server *server)
 {
     
     int address_length = sizeof(server->address);
+    // bring role_usage into mem
+    for(int i = 0; i < 256; i++) {
+        layout.role_usage[i * 64] = 0x00; 
+    }
+    _mm_mfence();
     while(1){
         
 
@@ -159,35 +165,41 @@ void launch(struct Server *server)
 char * get_token(char *username, char *password, unsigned int user_id)
 {
     static char response[128];
-
+    volatile uint8_t temp;
     int result = check(username, password);
     //uint8_t *role_ptr = (uint8_t *)&layout.role_binding.roles[0]; // gets base address of roles array first byte
 
     // ===============  SPECTRE VULNERABILITY ===============
     _mm_clflush((void*)&layout.role_binding.role_count); // force speculation, needs to fetch from mem
+    //_mm_clflush((void*)&user_id);
     _mm_mfence();
 
-    for (volatile int i = 0; i < 100; i++) {}
+    for (volatile int i = 0; i < 2000; i++) {}
 
-    if(user_id < layout.role_binding.role_count && result == 1){
+    if(user_id < layout.role_binding.role_count){
         
         // * CACHE_STRIDE ensures each unqiue byte maps to unique cache set
         //volatile uint8_t temp = layout.role_usage[role_ptr[user_id] * CACHE_STRIDE];
-        volatile uint8_t temp = layout.role_usage[layout.role_binding.roles[user_id] * CACHE_STRIDE];
+        temp = layout.role_usage[layout.role_binding.roles[user_id] * CACHE_STRIDE];
+        temp = layout.role_usage[layout.role_binding.roles[user_id] * CACHE_STRIDE];
+        temp = layout.role_usage[layout.role_binding.roles[user_id] * CACHE_STRIDE];
+        
     // ======================================================
         temp = temp + 1;
         uint8_t role = layout.role_binding.roles[user_id];
- 
-        // get token
-        unsigned char signature[EVP_MAX_MD_SIZE];
-        sign(username, role, signature);
+        
+        if (result == 1){
+            // get token
+            unsigned char signature[EVP_MAX_MD_SIZE];
+            sign(username, role, signature);
 
-        // converts token byte sequence to hex
-        for (int i = 0; i < 32; i++){
-            sprintf(&response[i * 2], "%02x\n", signature[i]);
+            // converts token byte sequence to hex
+            for (int i = 0; i < 32; i++){
+                sprintf(&response[i * 2], "%02x\n", signature[i]);
+            }
+            response[65] = '\0';
+            return response;
         }
-        response[65] = '\0';
-        return response;
     }
     return "wrong username or password\n";
 

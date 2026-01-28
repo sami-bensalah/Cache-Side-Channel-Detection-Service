@@ -43,9 +43,11 @@ struct RoleBinding{
 // forces key to come after roles array in memory
 struct SharedMemory {
     struct RoleBinding role_binding;
+    uint8_t padding1[128];
     uint8_t secret_key[8]; 
-    uint8_t role_usage[256 * 4096] __attribute__((aligned(4096))); // used for telemetry
-}__attribute__((packed)); // makes sure compiler doesnt add padding
+    uint8_t padding2[256];
+    uint8_t role_usage[256 * 64] __attribute__((aligned(4096))); // used for telemetry
+};
 extern struct SharedMemory layout;
 
 // initialises server_constructor
