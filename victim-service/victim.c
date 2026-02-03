@@ -25,9 +25,11 @@ int attack_id = ((unsigned long)&layout.secret_key[0]-(unsigned long)&layout.rol
 struct Users users;
 
 struct SharedMemory layout = {
-    //.role_binding.roles = {"guest", "user", "editor", "admin", "super"},
+    .role_binding.roles  ={0},
     .role_binding.role_count = ROLE_COUNT, // = 5,
-    .secret_key = {0x43, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80}
+    .padding1 = {0},
+    .padding2 = {0},
+    .secret_key = {0x23, 0x43, 0x17, 0x59, 0x25, 0x6B, 0x3D, 0x07}
 };
 
 
@@ -51,15 +53,16 @@ int main(){
 }
 
 void calc_set(){
-    uint8_t *role_ptr = (uint8_t *)&layout.role_binding.roles[0];
-    uint8_t byte = layout.role_binding.roles[attack_id];//role_ptr[attack_id];
-    uintptr_t address = (uintptr_t)&layout.role_usage[byte * CACHE_STRIDE]; // get mem address it will map to 
+    for (int i = attack_id; i < attack_id+8; i++){
+        uint8_t *role_ptr = (uint8_t *)&layout.role_binding.roles[0];
+        uint8_t byte = layout.role_binding.roles[i];//role_ptr[attack_id];
+        uintptr_t address = (uintptr_t)&layout.role_usage[byte * CACHE_STRIDE]; // get mem address it will map to 
 
-    int set = (address >> 6) & 0x3F;
+        int set = (address >> 6) & 0x3F;
 
-    // prints target byte that correct attack_id will speculativly load
-    printf("LEAKED BYTE: 0x%x, Memory Address: %p -> Set %d\n", role_ptr[attack_id], &layout.role_usage[role_ptr[attack_id] * CACHE_STRIDE], set);
-
+        // prints target byte that correct attack_id will speculativly load
+        printf("ATTACK ID: %d ,LEAKED BYTE: 0x%x, Memory Address: %p -> Set %d\n", i, role_ptr[i], &layout.role_usage[role_ptr[i] * CACHE_STRIDE], set);
+    }
 }
 
 struct Server server__constructor(int domain, int protocol, int type, in_addr_t interface, int port, int backlog, void(*launch)(struct Server *server))
@@ -145,50 +148,62 @@ void launch(struct Server *server)
             // gets params from POST body and assigns to local vars
             int status = get_POST_body(username, password, &user_id, buffer);
             if (status > 0){
+                // trains bp for Spectre_v1
+                char *training_up = "none"; 
+                for (int j = 40; j >= 0; j--) {
+                    _mm_clflush((void*)&layout.role_binding.role_count); 
+                    for (volatile int z = 0; z < 100; z++) {} //  (can also mfence)
+
+                    get_token(training_up, training_up, (j % 5));
+                }
+                
                 // sends result from get_token function
                 char *data = get_token(username, password, user_id);
-                http_response(response, RESPONSE_SIZE, 200, data);
-            
-            }
-            else{
-                // if POST request wrong
-                http_response(response, RESPONSE_SIZE, 400, "Malformed POST request");
+                if (data != NULL){
+                    http_response(response, RESPONSE_SIZE, 200, data);
+                    write(new_socket, response, strlen(response));
+                } 
+                else{
+                    data =  "HTTP/1.1 400 Not Authorised\r\n"
+                            "Content-Type: text/plain\r\n"
+                            "Content-Length: 30\r\n"
+                            "Connection: keep-alive\r\n"
+                            "\r\n"
+                            "Incorrect username or password";
+                     write(new_socket, data, strlen(data));
+                }
+
             }
 
-            write(new_socket, response, strlen(response));
+            
         }
         close(new_socket);
     }
 }
 
+volatile uint8_t temp;
 // generates response based on user credentials provided
 char * get_token(char *username, char *password, unsigned int user_id)
 {
-    static char response[128];
-    volatile uint8_t temp;
-    int result = check(username, password);
-    //uint8_t *role_ptr = (uint8_t *)&layout.role_binding.roles[0]; // gets base address of roles array first byte
-
     // ===============  SPECTRE VULNERABILITY ===============
-    _mm_clflush((void*)&layout.role_binding.role_count); // force speculation, needs to fetch from mem
-    //_mm_clflush((void*)&user_id);
+   
+    volatile uint8_t dummy = layout.role_binding.roles[0]; // loads into cache
+    _mm_clflush(&layout.role_binding.role_count);
     _mm_mfence();
-
-    for (volatile int i = 0; i < 2000; i++) {}
-
+    
     if(user_id < layout.role_binding.role_count){
         
-        // * CACHE_STRIDE ensures each unqiue byte maps to unique cache set
-        //volatile uint8_t temp = layout.role_usage[role_ptr[user_id] * CACHE_STRIDE];
-        temp = layout.role_usage[layout.role_binding.roles[user_id] * CACHE_STRIDE];
-        temp = layout.role_usage[layout.role_binding.roles[user_id] * CACHE_STRIDE];
-        temp = layout.role_usage[layout.role_binding.roles[user_id] * CACHE_STRIDE];
+        temp = layout.role_usage[layout.role_binding.roles[user_id] * CACHE_STRIDE]; // * CACHE_STRIDE ensures each unqiue byte maps to unique cache set
         
     // ======================================================
         temp = temp + 1;
         uint8_t role = layout.role_binding.roles[user_id];
         
+        int result = check(username, password);
+        _mm_mfence();
         if (result == 1){
+               static char response[128];
+   
             // get token
             unsigned char signature[EVP_MAX_MD_SIZE];
             sign(username, role, signature);
@@ -201,7 +216,8 @@ char * get_token(char *username, char *password, unsigned int user_id)
             return response;
         }
     }
-    return "wrong username or password\n";
+    return NULL;
+    //return "wrong username or password\n";
 
 }
 

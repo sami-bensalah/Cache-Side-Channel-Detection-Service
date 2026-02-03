@@ -36,7 +36,7 @@ extern struct Users users;
 struct RoleBinding{
     // both byte aligned to ensure that set mapping is reliable
     uint8_t roles[ROLE_COUNT] __attribute__((aligned(4096)));
-    volatile size_t role_count;
+    unsigned int role_count;
   
 };
 
@@ -47,7 +47,7 @@ struct SharedMemory {
     uint8_t secret_key[8]; 
     uint8_t padding2[256];
     uint8_t role_usage[256 * 64] __attribute__((aligned(4096))); // used for telemetry
-};
+}__attribute__((packed));
 extern struct SharedMemory layout;
 
 // initialises server_constructor
