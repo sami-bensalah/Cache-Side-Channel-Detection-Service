@@ -19,7 +19,7 @@
 #define LINE_SIZE 64
 #define L1_SIZE (WAYS * SETS * LINE_SIZE)
 #define NO_LINES (WAYS * SETS)
-
+#define PAGE_SIZE 4096
 
 // prime+probe
 #define ATTACK_RUNS 10000
@@ -36,9 +36,9 @@ typedef struct node {
     uint8_t padding[LINE_SIZE - sizeof(struct node*)]; // make 1 node = LINE_SIZE (64 bytes)
 } node_t;
 
-node_t *set_pointers[64]; // stores head pointers for each set linked list
+node_t *set_pointers[SETS]; // stores head pointers for each set linked list
 
-uint8_t probe_array[TWO_MB] __attribute__((aligned(4096))); // allocates int array of size = L1_SIZE and aligns to page
+uint8_t probe_array[TWO_MB] __attribute__((aligned(PAGE_SIZE))); // allocates int array of size = L1_SIZE and aligns to page
 
 uint64_t c_threshold;
 int shuffle_arr[SETS];
@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
     // get page table entries in cache lookup
     for (int i = 0; i < SETS; i++) {
         for (int w = 0; w < WAYS; w++) {
-            volatile uint8_t *addr = &probe_array[(w * 4096) + (i * 64)];
+            volatile uint8_t *addr = &probe_array[(w * 4096) + (i * LINE_SIZE)];
             volatile uint8_t dummy = *addr; 
         }
     }
@@ -187,15 +187,16 @@ void prime_cache(){
 
 
 void linked_list(){
-    node_t *sets_collection[64][10]; // will store addresses associated with set - to be later linked 
+    int item_count = WAYS + 2;
+    node_t *sets_collection[SETS][item_count]; // will store addresses associated with set - to be later linked 
 
-    for (int i = 0; i < (LINE_SIZE * SETS * 10); i += LINE_SIZE){ // iterates 10 pages (10 addresses per set)
+    for (int i = 0; i < (LINE_SIZE * SETS * item_count); i += LINE_SIZE){ // iterates 10 pages (10 addresses per set)
         //get the set
         intptr_t address = (intptr_t)&probe_array[i];
         int set = (address >> 6) & 0x3F;
 
         // store address under related set
-        sets_collection[set][(i/(LINE_SIZE * SETS))] = (node_t*) address;
+        sets_collection[set][(i/(PAGE_SIZE))] = (node_t*) address;
     }
 
     // shuffle the addresses under each set - tricks prefetcher
