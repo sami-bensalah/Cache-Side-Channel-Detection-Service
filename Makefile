@@ -1,36 +1,42 @@
 CC = gcc
 INCDIRS = -I.
 OPT = -O0 
-CFLAGS = -Wall -Wextra -Wpedantic -g $(INCDIRS) $(OPT) -march=native
-LIBS = -lcrypto -lcurl
+CFLAGS = -Wall -Wextra -Wpedantic -g $(INCDIRS) $(OPT) -no-pie -march=native 
+LIBS = -lcrypto
 
 VICTIM_FILE = victim-service/victim.c 
 ATTACKER_FILE = attacker-spy-service/attacker-spy.c
-CFILES = $(VICTIM_FILE) $(ATTACKER_FILE)
+LLC_A_FILE  = LLC-attacker/attacker.c
+CFILES = $(VICTIM_FILE) $(ATTACKER_FILE) $(LLC_A_FILE)
 
 V_OBJS = victim-service/victim.o
 A_OBJS = attacker-spy-service/attacker-spy.o
-OBJECTS = $(V_OBJS) $(A_OBJS) 
+LLC_A_OBJS = LLC-attacker/attacker.o
+OBJECTS = $(V_OBJS) $(A_OBJS) $(LLC_A_OBJS) 
 
 VICTIM_BIN = bin/victim-service
 ATTACKER_BIN = bin/attacker-spy-service
-BINARY = $(VICTIM_BIN) $(ATTACKER_BIN)
+LLC-ATTACKER_BIN = bin/attacker
+BINARY = $(VICTIM_BIN) $(ATTACKER_BIN) $(LLC-ATTACKER_BIN)
 
 # executable binaries - make all, make victim, make attacker
 all: $(BINARY) 
 victim: $(VICTIM_BIN)
 attacker: $(ATTACKER_BIN)
-
+llc-attacker: $(LLC-ATTACKER_BIN)
 # links victim-service/victim.o into bin/victim_service
 $(VICTIM_BIN): $(V_OBJS)
-	$(CC) -o $@ $^ $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
 
 # links attacker-spy-service/attacker-spy.o into bin/attacker_spy
 $(ATTACKER_BIN): $(A_OBJS)
-	$(CC) -o $@ $^ $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 # takes @ = bin and ^ = test.o and does gcc -o bin test.o to generate binary from objects
 # binary generated can then be executed using ./bin
+
+$(LLC-ATTACKER_BIN): $(LLC_A_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
 
 # uses % (regex) to defone a generic rule to say how any .c file can be compiled to a .o file
