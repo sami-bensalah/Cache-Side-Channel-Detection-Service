@@ -169,19 +169,27 @@ void launch(struct Server *server)
             if (status > 0){
                 // trains bp for Spectre_v1
                 char *training_up = "none"; 
-                for (int j = 50; j >= 0; j--) {
+                for (int k = 0; k < 200; k++) {
+                    volatile uint8_t warm_up = layout.secret_key[0]; // warm secret so no long fetch needed
+                    volatile uint8_t warm_roles = layout.role_binding.roles[0];
+                    
                     // flush to train bp
-                    _mm_clflush((void*)&layout.role_binding.role_count); 
-                    for (volatile int z = 0; z < 100; z++) {} //  (can also mfence)
+                    _mm_clflush(&layout.role_binding.role_count);
+                    _mm_mfence();
 
                     // call function with valid data
-                    get_token(training_up, training_up, (j % 5));
-                }
-                
+                    get_token(training_up, training_up, 0);
+                }   
+                _mm_lfence(); 
+
                 // sends result from get_token function
                 _mm_clflush(&layout.role_binding.role_count);
                 _mm_mfence();
+
+                for(volatile int z = 0; z < 100; z++) {} // pause
+
                 char *data = get_token(username, password, user_id);
+                _mm_mfence();
 
                 if (data != NULL){
                     http_response(response, RESPONSE_SIZE, 200, data);
@@ -198,8 +206,6 @@ void launch(struct Server *server)
                 }
 
             }
-
-            
         }
         close(new_socket);
     }
