@@ -36,6 +36,7 @@ extern struct Users users;
 struct RoleBinding{
     // both byte aligned to ensure that set mapping is reliable
     uint8_t roles[ROLE_COUNT] __attribute__((aligned(4096)));
+    uint8_t padding[128]; // prevents role_count being loaded into cache due to roles[]
     unsigned int role_count;
   
 };
@@ -46,7 +47,7 @@ struct SharedMemory {
     uint8_t padding1[128];
     uint8_t secret_key[8]; 
     uint8_t padding2[256];
-    uint8_t role_usage[256 * 64] __attribute__((aligned(4096))); // used for telemetry
+    uint8_t *role_usage; // used for telemetry
 }__attribute__((packed));
 extern struct SharedMemory layout;
 
@@ -70,3 +71,4 @@ int get_POST_body(char *username, char *password, unsigned int *id, const char *
 void http_response(char *response, int response_size, int status_code, char *message);
 
 void calc_set();
+void spectre_flush_reload();
