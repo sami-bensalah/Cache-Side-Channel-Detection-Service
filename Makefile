@@ -1,8 +1,16 @@
 CC = gcc
 INCDIRS = -I.
-OPT = -O0 
-CFLAGS = -Wall -Wextra -Wpedantic -g $(INCDIRS) $(OPT) -no-pie -march=native 
+OPT = -O0
+CFLAGS = -Wall -Wextra -Wpedantic -g $(INCDIRS) $(OPT) -march=native $(SPECTRE_FLAGS)
 LIBS = -lcrypto
+
+SPECTRE_FLAGS := \
+	-mindirect-branch=keep \
+	-mfunction-return=keep \
+	-fno-stack-protector \
+	-fno-stack-clash-protection \
+	-no-pie \
+	-fno-pie
 
 VICTIM_FILE = victim-service/victim.c 
 ATTACKER_FILE = attacker-spy-service/attacker-spy.c
@@ -31,10 +39,10 @@ $(VICTIM_BIN): $(V_OBJS)
 
 # links attacker-spy-service/attacker-spy.o into bin/attacker_spy
 $(ATTACKER_BIN): $(A_OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 # takes @ = bin and ^ = test.o and does gcc -o bin test.o to generate binary from objects
-# binary generated can then be executed using ./bin
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) 
 
+# links llc-attacker/attacker.o into bin/attacker
 $(LLC-ATTACKER_BIN): $(LLC_A_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
