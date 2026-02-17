@@ -22,7 +22,7 @@
 #define PAGE_SIZE 4096
 
 // prime+probe
-#define ATTACK_RUNS 10000
+#define ATTACK_RUNS 100
 #define EVICTION_THRESHOLD 400
 
 // socket
@@ -187,7 +187,7 @@ void prime_cache(){
 
 
 void linked_list(){
-    int item_count = WAYS + 2;
+    int item_count = WAYS;
     node_t *sets_collection[SETS][item_count]; // will store addresses associated with set - to be later linked 
 
     for (int i = 0; i < (LINE_SIZE * SETS * item_count); i += LINE_SIZE){ // iterates 10 pages (10 addresses per set)
@@ -203,9 +203,9 @@ void linked_list(){
     for (int set = 0; set < SETS; set++){
 
         // shuffle each item (address pointer)
-        for(int item = 0; item < 10; item++){
+        for(int item = 0; item < item_count; item++){
             node_t *tmp = sets_collection[set][item];
-            int shuffle_index = rand() % 10;
+            int shuffle_index = rand() % item_count;
             // swap
             sets_collection[set][item] = sets_collection[set][shuffle_index];
             sets_collection[set][shuffle_index] = tmp;
@@ -216,7 +216,7 @@ void linked_list(){
         set_pointers[set] = sets_collection[set][0];
         node_t *current = set_pointers[set];
 
-        while(i < 10){
+        while(i < item_count){
             current->next = sets_collection[set][i];
             current = current->next;
             i++;
