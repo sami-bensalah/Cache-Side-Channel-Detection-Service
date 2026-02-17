@@ -167,7 +167,6 @@ void launch(struct Server *server)
             // gets params from POST body and assigns to local vars
             int status = get_POST_body(username, password, &user_id, buffer);
             if (status > 0){
-                usleep(500); // big pause allowing my attacker to prime
                 // trains bp for Spectre_v1
                 for (int k = 0; k < 200; k++) {
                     volatile uint8_t warm_up = layout.secret_key[0]; // warm secret so no long fetch needed
@@ -224,7 +223,7 @@ char * get_token(char *username, char *password, unsigned int user_id)
     // ======================================================   
         temp = temp + 1;
     }
-    
+
     if(user_id < layout.role_binding.role_count){
         uint8_t role = layout.role_binding.roles[user_id];
         
