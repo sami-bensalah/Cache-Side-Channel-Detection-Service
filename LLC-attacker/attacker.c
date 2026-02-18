@@ -75,13 +75,14 @@ int main(int argc, char* argv[]) {
     int max = 0;
     uint8_t spiking_byte;
 
+    int byte_diff[255];
     for (int i = 0; i < 256; i++){ // from byte 0x00 - 0xFF
         int total_diff  = 0;
 
         uint8_t target_byte = (uint8_t)i;//strtoul(argv[2], NULL, 0);
         printf("\n===== EVICTION COUNT FOR BYTE %x =====\n", target_byte);
 
-        for (int r = 0; r < 10; r++){
+        for (int r = 0; r < 1; r++){
             node_t *probe_arr = build_linked_list(target_byte);
             if (probe_arr == NULL){
                 continue;
@@ -127,12 +128,14 @@ int main(int argc, char* argv[]) {
                 printf("threshold used: %ld\n", c_threshold);
             }
         }
+        byte_diff[i] = total_diff;
         if (total_diff > max){
             max = total_diff;
             spiking_byte = target_byte;
         }
         usleep(0);
     }   
+    byte_histogram(&byte_diff);
     printf("\nLargest Spike Byte: %x (%d)\n", spiking_byte, max);
 
     close(clientfd);
@@ -266,6 +269,19 @@ void shuffle(int shuffle_arr[]){
         shuffle_arr[i] = shuffle_arr[shuffle_index];
         shuffle_arr[shuffle_index] = tmp;
     }
+}
+
+void byte_histogram(int *byte_diffs){
+    printf("\n========== CACHE HIT HISTOGRAM ==========\n");
+    for (int i = 0; i < 256; i++){ 
+        int noBars = byte_diffs[i]/10;
+        printf("0x%02x | ", i);
+        for (int k = 0; k < noBars; k++) {
+            printf("|");
+        }
+        printf(" (%d)\n", byte_diffs[i]);
+    }
+    printf("=========================================\n");
 }
 
 uint64_t avg_hit_time(node_t *head){
