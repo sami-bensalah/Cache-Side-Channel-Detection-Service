@@ -7,8 +7,8 @@ typedef struct node {
     uint8_t padding[LINE_SIZE - sizeof(struct node*)]; // make 1 node = LINE_SIZE (64 bytes)
 } node_t;
 
-void check_cache_presence(node_t *base_ptr, int *result);
-void prime_cache(node_t *base_ptr);
+static inline __attribute__((always_inline)) void check_cache_presence(node_t *base_ptr, int *result);
+static inline __attribute__((always_inline)) void prime_cache(node_t *base_ptr);
 void get_inputs(char attack_data[], int argc, char* argv[]);
 void shuffle(node_t **items, int item_count);
 void open_socket(int *clientfd, struct sockaddr_in *servaddr);
