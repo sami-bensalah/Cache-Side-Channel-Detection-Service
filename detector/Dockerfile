@@ -6,19 +6,18 @@ RUN apt-get update && apt-get install -y \
     linux-tools-common \
     linux-tools-generic \
     curl \
-    jq
+    jq \
+    && apt-get clean
 
 ENV CRICTL_VERSION="v1.32.0"
 RUN curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-amd64.tar.gz | tar -xz -C /usr/local/bin
+
+# skips binary with kernel checks throwing errors
+RUN ln -sf /usr/lib/linux-tools/*/perf /usr/bin/perf 
 
 COPY collector.py /app/collector.py
 COPY crictl.yaml /etc/crictl.yaml
 WORKDIR /app
 
-RUN mkdir -p /app/output
-
-# fixes permission issues in cluster
-RUN chgrp -R 0 /app/output && \
-    chmod -R g=u /app/output 
 
 CMD ["python3", "collector.py"]
