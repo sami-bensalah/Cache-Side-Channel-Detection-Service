@@ -14,7 +14,7 @@ def get_llc_misses(pid):
 
 def get_pids(namespaces):
     all_pids  = []
-    f = open("out.txt", "w")
+    f = open("./output/out.txt", "w")
     try:
         for n in namespaces:
             print("CHECKING NAMESPACE: "+n)
