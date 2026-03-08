@@ -4,17 +4,29 @@ import json
 import time
 
 def get_llc_misses(pid):
-    cmd = ["perf", "stat", "-e", "LLC-load-misses", "-p",str(pid), "sleep", "0.1"]
+    cmd = ["perf", "stat", "-e", "cache-misses,cache-references", "-p",str(pid), "sleep", "0.5"]
     output = subprocess.run(cmd, capture_output=True, text=True).stderr
+    
+    if "<not counted>" in output:
+        print(f"[PID {pid}] Warning: no metrics collected (<not counted>)")
+        return -1
+    
+    miss_match = re.search(r'([\d,]+)\s+cache-misses', output)
+    ref_match = re.search(r'([\d,]+)\s+cache-references', output)
 
-    match = re.search(r'([\d,]+)\s+LLC-load-misses', output)
-    count = int(match.group(1).replace(',', ''))
-    print(count)
+    if miss_match and ref_match:
+        misses = int(miss_match.group(1).replace(',', ''))
+        refs = int(ref_match.group(1).replace(',', ''))
+        
+        print(f"[PID {pid}] Misses: {misses}, References: {refs}")
+        return [misses, refs]
+    else:
+        print(f"[PID {pid}] Error: error in fetching cache metrics for pid {pid}")
+        return -1
 
 
 def get_pids(namespaces):
     all_pids  = []
-    f = open("./output/out.txt", "w")
     try:
         for n in namespaces:
             print("CHECKING NAMESPACE: "+n)
@@ -26,14 +38,14 @@ def get_pids(namespaces):
                 print("NO RUNNING PODS FOUND")
                 continue
             for pod_id in pod_ids:
-                print("POD ID:"+pod_id)
+                #print("POD ID:"+pod_id)
                 # gets container ids in pod
                 cntr_cmd = ["crictl", "ps", "--pod", pod_id, "-q"]
                 cntr_output = subprocess.run(cntr_cmd, capture_output=True, text=True).stdout
                 container_ids = cntr_output.strip().splitlines()
                 for container_id in container_ids:
                     # gets pid of each container
-                    print("CONTAINER ID:"+container_id)
+                    #print("CONTAINER ID:"+container_id)
                     pid_cmd = ["crictl", "inspect", container_id]
                     pids = subprocess.run(pid_cmd, capture_output=True, text=True).stdout
                     js = json.loads(pids)
@@ -41,14 +53,22 @@ def get_pids(namespaces):
                     print("PID:"+str(pid))
                     all_pids.append(str(pid))
 
-        f.write("\n".join(all_pids)+"\n")
-        f.close()
+        return all_pids
     except Exception as e:
         error = "ERROR: "+str(e)
         print(error)
-        f.close()
+        return -1
 
 
 monitored_namespaces = ["test-space"] # namespaces to monitor
 
-get_pids(monitored_namespaces)
+while(1):
+    pids = get_pids(monitored_namespaces)
+    if pids == -1:
+        break
+    for pid in pids:
+        metrics = get_llc_misses(pid)
+        if metrics != -1:
+            misses = metrics[0]
+            references = metrics[1]
+            
