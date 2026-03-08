@@ -2,6 +2,7 @@ import subprocess
 import re
 import json
 import time
+from prometheus_client import start_http_server, Gauge
 
 def get_llc_misses(pid):
     cmd = ["perf", "stat", "-e", "cache-misses,cache-references", "-p",str(pid), "sleep", "0.5"]
@@ -58,7 +59,14 @@ def get_pids(namespaces):
         error = "ERROR: "+str(e)
         print(error)
         return -1
+    
 
+# prom metrics - metric name, description, label
+LLC_MISSES = Gauge('llc_cache_misses', 'LLC misses per PID', ['pid'])
+LLC_REFS = Gauge('llc_cache_references', 'LLC references per PID', ['pid'])
+
+start_http_server(8000) # start metric server
+print("prometheus client started on port 8000")
 
 monitored_namespaces = ["test-space"] # namespaces to monitor
 
@@ -72,3 +80,5 @@ while(1):
             misses = metrics[0]
             references = metrics[1]
             
+            LLC_MISSES.labels(pid=pid).set(misses)
+            LLC_REFS.labels(pid=pid).set(references)
