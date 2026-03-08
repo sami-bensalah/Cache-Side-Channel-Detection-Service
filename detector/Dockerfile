@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y \
 ENV CRICTL_VERSION="v1.32.0"
 RUN curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-amd64.tar.gz | tar -xz -C /usr/local/bin
 
+RUN pip install prometheus-client
+
 # skips binary with kernel checks throwing errors
 RUN ln -sf /usr/lib/linux-tools/*/perf /usr/bin/perf 
 
