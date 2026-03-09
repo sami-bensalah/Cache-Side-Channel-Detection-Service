@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "6"
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"prometheus:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"prometheus\")].image"}]'
+    openshift.io/generated-by: OpenShiftNewApp
+  creationTimestamp: "2026-03-08T18:14:46Z"
+  generation: 6
+  labels:
+    app: prometheus
+    app.kubernetes.io/component: prometheus
+    app.kubernetes.io/instance: prometheus
+  name: prometheus
+  namespace: collector
+  resourceVersion: "360749"
+  uid: 3b7ad1b5-0151-41ae-ac83-84b9d7a167d9
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      deployment: prometheus
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2026-03-09T22:14:35Z"
+        openshift.io/generated-by: OpenShiftNewApp
+      creationTimestamp: null
+      labels:
+        deployment: prometheus
+    spec:
+      containers:
+      - image: prom/prometheus@sha256:82bb24e3e06c60145789c95653b187f9b73fe7012489a756a0c4fa490a7829f6
+        imagePullPolicy: IfNotPresent
+        name: prometheus
+        ports:
+        - containerPort: 9090
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /prometheus
+          name: prometheus-volume-1
+        - mountPath: /etc/prometheus
+          name: config-volume
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - emptyDir: {}
+        name: prometheus-volume-1
+      - configMap:
+          defaultMode: 420
+          name: prom-config
+        name: config-volume
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-03-09T22:14:37Z"
+    lastUpdateTime: "2026-03-09T22:14:37Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-03-08T18:14:46Z"
+    lastUpdateTime: "2026-03-09T22:14:37Z"
+    message: ReplicaSet "prometheus-cfb5f4d5f" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 6
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
