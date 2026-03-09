@@ -4,8 +4,10 @@ import json
 import time
 from prometheus_client import start_http_server, Gauge
 
+import detector
+
 def get_llc_misses(pid):
-    cmd = ["perf", "stat", "-e", "cache-misses,cache-references", "-p",str(pid), "sleep", "0.5"]
+    cmd = ["perf", "stat", "-e", "cache-misses,cache-references", "-p",str(pid), "sleep", "1"]
     output = subprocess.run(cmd, capture_output=True, text=True).stderr
     
     if "<not counted>" in output:
@@ -80,5 +82,13 @@ while(1):
             misses = metrics[0]
             references = metrics[1]
             
+            pid_miss_avg = detector.get_prometheus_baseline(pid)
+            if pid_miss_avg is not None:
+                if pid_miss_avg < misses:
+                    print(f"[PID {pid}] HIGHER CACHE MISS MEASUREMENT THAN AVG: {pid_miss_avg} < {misses}")
+            else:
+                print(f"Waiting for baseline data for PID {pid}...")
+
             LLC_MISSES.labels(pid=pid).set(misses)
             LLC_REFS.labels(pid=pid).set(references)
+
