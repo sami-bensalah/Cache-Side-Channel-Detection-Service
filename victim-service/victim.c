@@ -142,23 +142,22 @@ void launch(struct Server *server)
     _mm_mfence();
     while(1){
         
-
-        //printf("\n========== WAITING FOR CONNECTION ==========\n");
+        printf("\n========== WAITING FOR CONNECTION ==========\n");
         //fflush(stdout);
         int new_socket = accept(server->socket, (struct sockaddr *)&server->address, (socklen_t *)&address_length);
 
         while(1){
-            char buffer[BUFFER_SIZE] = {0};
+            char buffer[BUFFER_SIZE];
             char response[RESPONSE_SIZE];
 
             int noBytes = read(new_socket, buffer, BUFFER_SIZE);
             if (noBytes < 1){
-                //printf("\n========== CLIENT DISCONNECTED ==========\n");
+                printf("\n========== CLIENT DISCONNECTED ==========\n");
                 break;
             }
 
-            //printf("\n========== NEW REQUEST ==========\n");
-            //printf("%s\n", buffer);
+            printf("\n========== NEW REQUEST ==========\n");
+            printf("%s\n", buffer);
 
             char username[USERNAME_MAX];
             char password[PASSWORD_MAX];
@@ -169,8 +168,7 @@ void launch(struct Server *server)
                 // trains bp for Spectre_v1
                 int training_loops = 200 + (rand() % 30); // rndomised training loop so bp can't learn
                 for (int k = 0; k < training_loops; k++) {
-                    //volatile uint8_t warm_up = layout.secret_key[0]; // warm secret so no long fetch needed
-                    volatile uint8_t warm_roles = layout.role_binding.roles[0];
+                    volatile uint8_t warm_roles = layout.role_binding.roles[0];  // warm roles so no long fetch needed
                     
                     // flush to train bp
                     _mm_clflush(&layout.role_binding.role_count);
@@ -191,17 +189,19 @@ void launch(struct Server *server)
                 _mm_mfence();
 
                 if (data != NULL){
-                    http_response(response, RESPONSE_SIZE, 200, data);
-                    write(new_socket, response, strlen(response));
+                    //http_response(response, RESPONSE_SIZE, 200, data);
+                    //write(new_socket, response, strlen(response));
+                    write(new_socket, "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\nX", 38);
                 } 
                 else{
-                    data =  "HTTP/1.1 400 Not Authorised\r\n"
-                            "Content-Type: text/plain\r\n"
-                            "Content-Length: 30\r\n"
-                            "Connection: keep-alive\r\n"
-                            "\r\n"
-                            "Incorrect username or password";
-                     write(new_socket, data, strlen(data));
+                    // data =  "HTTP/1.1 400 Not Authorised\r\n"
+                            // "Content-Type: text/plain\r\n"
+                            // "Content-Length: 30\r\n"
+                            // "Connection: keep-alive\r\n"
+                            // "\r\n"
+                            // "Incorrect username or password";
+                    // write(new_socket, data, strlen(data));
+                    write(new_socket, "HTTP/1.1 400 Bad Request\r\nContent-Length: 1\r\n\r\nX", 48);
                 }
 
             }
