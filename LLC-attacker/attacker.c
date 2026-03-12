@@ -73,6 +73,8 @@ int main(int argc, char* argv[]) {
 
     node_t *slice_sets[SLICE_COUNT];
     build_slice_sets(target_byte, slice_sets);
+    printf("\npress ENTER to execute attack with eviction set\n");
+    getchar();  // waits for the user to press Enter
     for (int i = 0; i < 3; i++){ // from byte 0x00 - 0xFF
         int total_diff  = 0;
        
@@ -92,7 +94,6 @@ int main(int argc, char* argv[]) {
                     // BASELINE
                     send(clientfd, baseline_data, strlen(baseline_data), 0);
                     recv(clientfd, buf, sizeof(buf), 0); 
-                    _mm_mfence();
 
                     //PROBE
                     check_cache_presence(probe_arr, &baseline_count);
