@@ -70,12 +70,14 @@ LLC_REFS = Gauge('llc_cache_references', 'LLC references per PID', ['pid'])
 start_http_server(8000) # start metric server
 print("prometheus client started on port 8000")
 
-monitored_namespaces = ["test-space"] # namespaces to monitor
+monitored_namespaces = ["test-space", "spectre-victim"] # namespaces to monitor
 
 while(1):
     pids = get_pids(monitored_namespaces)
     if pids == -1:
         break
+    if pids == []:
+        print("no pods to track in the targeted namespace")
     for pid in pids:
         metrics = get_llc_misses(pid)
         if metrics != -1:
