@@ -13,39 +13,46 @@ SPECTRE_FLAGS := \
 	-fno-pie
 
 VICTIM_FILE = victim-service/victim.c 
-ATTACKER_FILE = attacker-spy-service/attacker-spy.c
+L1_ATTACKER_FILE = attacker-spy-service/attacker-spy.c
 LLC_A_FILE  = LLC-attacker/attacker.c
-CFILES = $(VICTIM_FILE) $(ATTACKER_FILE) $(LLC_A_FILE)
+RHOCP_A_FILE = RHOCP-attacker/cloud-attacker.c
+CFILES = $(VICTIM_FILE) $(L1_ATTACKER_FILE) $(LLC_A_FILE) $(RHOCP_A_FILE)
 
 V_OBJS = victim-service/victim.o
-A_OBJS = attacker-spy-service/attacker-spy.o
+L1_A_OBJS = attacker-spy-service/attacker-spy.o
 LLC_A_OBJS = LLC-attacker/attacker.o
-OBJECTS = $(V_OBJS) $(A_OBJS) $(LLC_A_OBJS) 
+RHOCP_A_OBJS = RHOCP-attacker/cloud-attacker.o
+OBJECTS = $(V_OBJS) $(L1_A_OBJS) $(LLC_A_OBJS) $(RHOCP_A_OBJS)
 
 VICTIM_BIN = bin/victim-service
-ATTACKER_BIN = bin/attacker-spy-service
-LLC-ATTACKER_BIN = bin/attacker
-BINARY = $(VICTIM_BIN) $(ATTACKER_BIN) $(LLC-ATTACKER_BIN)
+L1-ATTACKER_BIN = bin/l1-attacker
+LLC-ATTACKER_BIN = bin/llc-attacker
+RHOCP_ATTACKS_BIN = bin/cloud-attacker
+BINARY = $(VICTIM_BIN) $(L1-ATTACKER_BIN) $(LLC-ATTACKER_BIN) $(RHOCP_ATTACKS_BIN)
 
 # executable binaries - make all, make victim, make attacker
 all: $(BINARY) 
 victim: $(VICTIM_BIN)
-attacker: $(ATTACKER_BIN)
+l1-attacker: $(L1-ATTACKER_BIN)
 llc-attacker: $(LLC-ATTACKER_BIN)
+cloud-attacker: $(RHOCP_ATTACKS_BIN)
 # links victim-service/victim.o into bin/victim_service
 $(VICTIM_BIN): $(V_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
 
-# links attacker-spy-service/attacker-spy.o into bin/attacker_spy
-$(ATTACKER_BIN): $(A_OBJS)
+# links attacker-spy-service/attacker-spy.o into bin/l1-attacker
+$(L1-ATTACKER_BIN): $(L1_A_OBJS)
 # takes @ = bin and ^ = test.o and does gcc -o bin test.o to generate binary from objects
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) 
 
-# links llc-attacker/attacker.o into bin/attacker
+# links llc-attacker/attacker.o into bin/llc-attacker
 $(LLC-ATTACKER_BIN): $(LLC_A_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
+# links LLC-attack/send-attacks.o into bin/send-attacks
+$(RHOCP_ATTACKS_BIN): $(RHOCP_A_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
 # uses % (regex) to defone a generic rule to say how any .c file can be compiled to a .o file
 %.o: %.c # @ is makefile variable for target (left side, i.e, %.o) and ^ is for dependencies (right side, i.e, %.c)
