@@ -1,0 +1,4 @@
+/detector/cluster-setup.txt
+/bin/
+/detector/build_deploy.sh
+/*/*.o
