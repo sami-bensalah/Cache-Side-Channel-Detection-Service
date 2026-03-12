@@ -147,7 +147,7 @@ void launch(struct Server *server)
         int new_socket = accept(server->socket, (struct sockaddr *)&server->address, (socklen_t *)&address_length);
 
         while(1){
-            char buffer[BUFFER_SIZE];
+            char buffer[BUFFER_SIZE] = {0};
             char response[RESPONSE_SIZE];
 
             int noBytes = read(new_socket, buffer, BUFFER_SIZE);
