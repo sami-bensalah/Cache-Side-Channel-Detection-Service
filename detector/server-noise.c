@@ -21,10 +21,7 @@ void open_socket(int *clientfd, struct sockaddr_in *servaddr){
 
 void send_request(int *clientfd){
     char buf[256] = {0};
-    struct sockaddr_in servaddr;
-
-    open_socket(clientfd, &servaddr);
-    connect(*clientfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+    
     
     char *request;
     char *g_request = 
@@ -62,10 +59,13 @@ void send_request(int *clientfd){
 int clientfd;
 
 int main() {
-    // sends aprox 2 reqs per sec
+    struct sockaddr_in servaddr;
+    open_socket(&clientfd, &servaddr);
+    connect(clientfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+    // sends reqs
     while(1){
-        usleep(500000); // 0.5s pause 
+        usleep(5000); // pause
         send_request(&clientfd);
-        close(clientfd);
+        //close(clientfd);
     }
 }
