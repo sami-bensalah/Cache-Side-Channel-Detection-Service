@@ -7,7 +7,7 @@ from prometheus_client import start_http_server, Gauge
 import detector
 
 def get_llc_misses(pid):
-    cmd = ["perf", "stat", "-e", "cache-misses,cache-references", "-p",str(pid), "sleep", "1"]
+    cmd = ["perf", "stat", "-e", "cache-misses,cache-references,branch-loads,branch-misses", "-p",str(pid), "sleep", "1"]
     output = subprocess.run(cmd, capture_output=True, text=True).stderr
     
     if "<not counted>" in output:
@@ -17,12 +17,18 @@ def get_llc_misses(pid):
     miss_match = re.search(r'([\d,]+)\s+cache-misses', output)
     ref_match = re.search(r'([\d,]+)\s+cache-references', output)
 
-    if miss_match and ref_match:
+    b_miss_match = re.search(r'([\d,]+)\s+branch-misses', output)
+    b_loads_match = re.search(r'([\d,]+)\s+branch-loads', output)
+
+    if miss_match and ref_match and b_miss_match and b_loads_match:
         misses = int(miss_match.group(1).replace(',', ''))
         refs = int(ref_match.group(1).replace(',', ''))
         
+        b_misses = int(b_miss_match.group(1).replace(',', ''))
+        b_loads = int(b_loads_match.group(1).replace(',', ''))
+
         print(f"[PID {pid}] Misses: {misses}, References: {refs}")
-        return [misses, refs]
+        return [misses, refs, b_misses, b_loads]
     else:
         print(f"[PID {pid}] Error: error in fetching cache metrics for pid {pid}")
         return -1
@@ -66,6 +72,11 @@ def get_pids(namespaces):
 # prom metrics - metric name, description, label
 LLC_MISSES = Gauge('llc_cache_misses', 'LLC misses per PID', ['pid'])
 LLC_REFS = Gauge('llc_cache_references', 'LLC references per PID', ['pid'])
+LLC_RATIO =  Gauge('llc_ratio', 'ratio of misses:refs per PID', ['pid'])
+
+LLC_B_MISSES = Gauge('llc_branch_misses', 'LLC branch misses per PID', ['pid'])
+LLC_B_LOADS = Gauge('llc_branch_loads', 'LLC branch loads per PID', ['pid'])
+LLC_B_RATIO =  Gauge('llc_branch_ratio', 'ratio of branch-misses:branch-loads per PID', ['pid'])
 
 start_http_server(8000) # start metric server
 print("prometheus client started on port 8000")
@@ -83,7 +94,12 @@ while(1):
         if metrics != -1:
             misses = metrics[0]
             references = metrics[1]
+            b_misses = metrics[2]
+            b_loads = metrics[3]
             
+            cache_ratio = misses/references
+            branch_ratio = b_misses/b_loads
+
             pid_miss_avg = detector.get_prometheus_baseline(pid)
             if pid_miss_avg is not None:
                 if pid_miss_avg < misses:
@@ -93,4 +109,9 @@ while(1):
 
             LLC_MISSES.labels(pid=pid).set(misses)
             LLC_REFS.labels(pid=pid).set(references)
+            LLC_RATIO.labels(pid=pid).set(cache_ratio)
+
+            LLC_B_MISSES.labels(pid=pid).set(b_misses)
+            LLC_B_LOADS.labels(pid=pid).set(b_loads)
+            LLC_B_RATIO.labels(pid=pid).set(branch_ratio)
 
