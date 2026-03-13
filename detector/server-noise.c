@@ -41,7 +41,7 @@ void send_request(int *clientfd){
     "Connection: keep-alive\r\n"
     "\r\n"
     "username=kdfds&password=hgsvhfbk&id=2";
-    srand(time(NULL));
+    
     if (rand()%2 == 0){
         request = g_request;
         printf("G REQUEST\n");
@@ -59,6 +59,8 @@ void send_request(int *clientfd){
 int clientfd;
 
 int main() {
+    srand(time(NULL));
+
     struct sockaddr_in servaddr;
     open_socket(&clientfd, &servaddr);
     connect(clientfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
