@@ -14,6 +14,7 @@ RUN curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRI
 
 RUN pip install prometheus-client
 RUN pip install requests
+RUN pip install scikit-learn
 
 # skips binary with kernel checks throwing errors
 RUN ln -sf /usr/lib/linux-tools/*/perf /usr/bin/perf 
