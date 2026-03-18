@@ -6,8 +6,11 @@ from prometheus_client import start_http_server, Gauge
 
 import detector
 
+POD_START_TIME = time.time()
+
+
 def get_llc_misses(pid):
-    cmd = ["perf", "stat", "-e", "cache-misses,cache-references,branch-loads,branch-misses", "-p",str(pid), "sleep", "1"]
+    cmd = ["perf", "stat", "-e", "cache-misses,cache-references,branch-loads,branch-misses,cycles,instructions", "-p",str(pid), "sleep", "1"]
     output = subprocess.run(cmd, capture_output=True, text=True).stderr
     
     if "<not counted>" in output:
@@ -20,6 +23,9 @@ def get_llc_misses(pid):
     b_miss_match = re.search(r'([\d,]+)\s+branch-misses', output)
     b_loads_match = re.search(r'([\d,]+)\s+branch-loads', output)
 
+    instructions_match = re.search(r'([\d,]+)\s+instructions', output)
+    cycles_match = re.search(r'([\d,]+)\s+cycles', output)
+
     if miss_match and ref_match and b_miss_match and b_loads_match:
         misses = int(miss_match.group(1).replace(',', ''))
         refs = int(ref_match.group(1).replace(',', ''))
@@ -27,8 +33,11 @@ def get_llc_misses(pid):
         b_misses = int(b_miss_match.group(1).replace(',', ''))
         b_loads = int(b_loads_match.group(1).replace(',', ''))
 
+        instructions = int(instructions_match.group(1).replace(',', ''))
+        cycles = int(cycles_match.group(1).replace(',', ''))
+
         print(f"[PID {pid}] Misses: {misses}, References: {refs}")
-        return [misses, refs, b_misses, b_loads]
+        return [misses, refs, b_misses, b_loads, instructions, cycles]
     else:
         print(f"[PID {pid}] Error: error in fetching cache metrics for pid {pid}")
         return -1
@@ -78,11 +87,16 @@ LLC_B_MISSES = Gauge('llc_branch_misses', 'LLC branch misses per PID', ['pid'])
 LLC_B_LOADS = Gauge('llc_branch_loads', 'LLC branch loads per PID', ['pid'])
 LLC_B_RATIO =  Gauge('llc_branch_ratio', 'ratio of branch-misses:branch-loads per PID', ['pid'])
 
+I_COUNT = Gauge('intruction_count', 'number of instructions executed for PID', ['pid'])
+CYCLES = Gauge('cycle_count', 'number of cpu cycles executed', ['pid'])
+I_PER_C = Gauge('instructions_per_cycle', 'ratio of instructions:cycles for pid', ['pid'])
+
 start_http_server(8000) # start metric server
 print("prometheus client started on port 8000")
 
 monitored_namespaces = ["test-space", "spectre-victim"] # namespaces to monitor
 
+prev_min = 0
 while(1):
     pids = get_pids(monitored_namespaces)
     if pids == -1:
@@ -96,16 +110,19 @@ while(1):
             references = metrics[1]
             b_misses = metrics[2]
             b_loads = metrics[3]
+            instructions = metrics[4]
+            cycles = metrics[5]
             
             cache_ratio = misses/references
             branch_ratio = b_misses/b_loads
+            i_per_c = instructions/cycles
 
-            pid_miss_avg = detector.get_prometheus_baseline(pid)
-            if pid_miss_avg is not None:
-                if pid_miss_avg < misses:
-                    print(f"[PID {pid}] HIGHER CACHE MISS MEASUREMENT THAN AVG: {pid_miss_avg} < {misses}")
-            else:
-                print(f"Waiting for baseline data for PID {pid}...")
+            # runs model rebuild every 60s
+            uptime = time.time() - POD_START_TIME
+            minute = uptime // 60
+            if minute > prev_min:
+                detector.get_model_data(pid)
+                prev_min = minute
 
             LLC_MISSES.labels(pid=pid).set(misses)
             LLC_REFS.labels(pid=pid).set(references)
@@ -115,3 +132,6 @@ while(1):
             LLC_B_LOADS.labels(pid=pid).set(b_loads)
             LLC_B_RATIO.labels(pid=pid).set(branch_ratio)
 
+            I_COUNT.labels(pid=pid).set(instructions)
+            CYCLES.labels(pid=pid).set(cycles)
+            I_PER_C.labels(pid=pid).set(i_per_c)
