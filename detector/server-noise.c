@@ -66,7 +66,7 @@ int main() {
     connect(clientfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
     // sends reqs
     while(1){
-        usleep(5000); // pause
+        usleep(100000); // pause
         send_request(&clientfd);
         //close(clientfd);
     }
