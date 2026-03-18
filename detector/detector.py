@@ -1,5 +1,5 @@
 import requests
-import statistics
+from sklearn.linear_model import LinearRegression
 
 # prom service internal cluster URL
 PROM_URL = "http://prometheus.collector.svc.cluster.local:9090/api/v1/query"
@@ -31,7 +31,17 @@ def get_model_data(pid):
 
         raw_data = [float(val[1]) for val in result[0]['values']]
         metric_data[metric] = raw_data
-    print(metric_data)
-
+    
     return metric_data
 
+def build_model(pid):
+    metric_data = get_model_data(pid)
+
+    # zip metrics together to create points [a, b, c] -> [refs, ipc, branch_ratio]
+    X = list(zip(metric_data["llc_cache_references"], metric_data["instructions_per_cycle"], metric_data["llc_branch_ratio"]))
+    y = metric_data["llc_cache_misses"] 
+    
+    model = LinearRegression().fit(X, y)
+    print(f"Model Accuracy (R^2): {model.score(X, y):.4f}")
+
+    return model
