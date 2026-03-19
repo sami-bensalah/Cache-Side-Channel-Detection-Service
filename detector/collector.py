@@ -5,6 +5,7 @@ import time
 from prometheus_client import start_http_server, Gauge
 from sklearn.linear_model import LinearRegression # type: ignore
 import statistics
+import collections
 
 import detector
 
@@ -99,19 +100,35 @@ print("prometheus client started on port 8000")
 monitored_namespaces = ["test-space", "spectre-victim"] # namespaces to monitor
 
 prev_min = 0
-curr_model = None
-curr_stdev = 0
+curr_models = {}
+curr_stdevs = {}
 
-remodel = True
-anomaly_ratios = []
+remodel_status = collections.defaultdict(lambda: True)
+
+pid_anomalies = collections.defaultdict(list)
+
 anomaly_count = 0
 non_anomaly = 0
+pid_anomaly_count = collections.defaultdict(int)
+pid_non_anomaly_count = collections.defaultdict(int)
+
 while(1):
     pids = get_pids(monitored_namespaces)
     if pids == -1:
         break
     if pids == []:
         print("no pods to track in the targeted namespace")
+    
+    # runs model rebuild every 60s
+    uptime = time.time() - POD_START_TIME
+    minute = uptime // 60
+
+    # builds new models
+    for pid in pids:
+        if minute > prev_min and remodel_status[pid] == True:
+            curr_models[pid], curr_stdevs[pid] = detector.build_model(pid)
+    prev_min = minute
+
     for pid in pids:
         metrics = get_llc_misses(pid)
         if metrics != -1:
@@ -126,43 +143,41 @@ while(1):
             branch_ratio = b_misses/b_loads
             i_per_c = instructions/cycles
 
-            # runs model rebuild every 60s
-            uptime = time.time() - POD_START_TIME
-            minute = uptime // 60
-            if minute > prev_min and remodel == True:
-                curr_model, curr_stdev = detector.build_model(pid)
-                prev_min = minute
             
-            if minute > 0:
+            if minute > 0 and pid in curr_models:
                 vals = [references, i_per_c, branch_ratio]
-                if detector.is_anomaly(vals, curr_model, curr_stdev, misses):
-                    print("[ANOMALY DETECTED] Possibly Dangerous Cache Behaviour", flush=True)
-                    anomaly_ratios.append(cache_ratio)
-                    remodel = False
-                    anomaly_count += 1
-                    non_anomaly = 0
-                elif remodel == False:
-                    non_anomaly += 1
+                if detector.is_anomaly(vals, curr_models[pid], curr_stdevs[pid], misses):
+                    print(f"[PID {pid}][ANOMALY DETECTED] Possibly Dangerous Cache Behaviour", flush=True)
+                    pid_anomalies[pid].append(cache_ratio)
+                    remodel_status[pid] = False
+                    pid_anomaly_count[pid] += 1
+                    pid_non_anomaly_count[pid] = 0
+                elif remodel_status[pid] == False:
+                    pid_non_anomaly_count[pid] += 1
 
-                if non_anomaly > 10:
-                    print("[CLEARED] Investigated signal was not an attack", flush=True)
-                    remodel = True
-                    non_anomaly = 0
-                    anomaly_ratios = []
-                    anomaly_count = 0
+                if pid_non_anomaly_count[pid] > 10:
+                    print(f"[PID {pid}][CLEARED] Investigated signal was not an attack", flush=True)
+                    remodel_status[pid] = True
+                    pid_anomalies[pid] = []
+                    pid_non_anomaly_count[pid] = 0
+                    pid_anomaly_count[pid] = 0
                 
-                if anomaly_count == 20:
-                    stdev = statistics.stdev(anomaly_ratios)
-                    print(f"Anomolous measuremnnts standard deviation: {stdev}")
+                if pid_anomaly_count[pid] >= 20:
+                    stdev = statistics.stdev(pid_anomalies[pid])
+                    print(f"[PID {pid}] Anomolous measuremnnts standard deviation: {stdev}")
                     if float(stdev) < 0.01:
-                        print("[ATTACK DETECTED] Severe Cache Side Channel Attack Detected", flush=True)
+                        print(f"[PID {pid}][ATTACK DETECTED] Severe Cache Side Channel Attack Detected", flush=True)
                         exit(1)
                     else:
-                        print("[CLEARED] Investigated signal was not an attack", flush=True)
-                        remodel = True
-                        non_anomaly = 0
-                        anomaly_ratios = []
-                        anomaly_count = 0
+                        print(f"[PID {pid}][CLEARED] Investigated signal was not an attack", flush=True)
+                        remodel_status[pid] = True
+                        pid_anomalies[pid] = []
+                        pid_non_anomaly_count[pid] = 0
+                        pid_anomaly_count[pid] = 0
+
+                        curr_models[pid], curr_stdevs[pid] = detector.build_model(pid)
+            else:
+                print(f"[PID {pid}] No Model Available Yet", flush=True)
 
             LLC_MISSES.labels(pid=pid).set(misses)
             LLC_REFS.labels(pid=pid).set(references)
