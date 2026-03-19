@@ -45,7 +45,7 @@ def build_model(pid):
     model = LinearRegression().fit(X, y)
     
     stdev = statistics.stdev(metric_data["llc_cache_misses"])
-    print(f"Model Accuracy (R^2): {model.score(X, y):.4f}, Standard Dev: {stdev}")
+    print(f"[PID {pid}] Model Accuracy (R^2): {model.score(X, y):.4f}, Standard Dev: {stdev}")
     return model, stdev
 
 def is_anomaly(metrics, model, stdev, actual_misses):
