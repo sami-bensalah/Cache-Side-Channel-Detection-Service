@@ -3,6 +3,8 @@ import re
 import json
 import time
 from prometheus_client import start_http_server, Gauge
+from sklearn.linear_model import LinearRegression # type: ignore
+import statistics
 
 import detector
 
@@ -36,7 +38,7 @@ def get_llc_misses(pid):
         instructions = int(instructions_match.group(1).replace(',', ''))
         cycles = int(cycles_match.group(1).replace(',', ''))
 
-        print(f"[PID {pid}] Misses: {misses}, References: {refs}")
+        print(f"[PID {pid}] Misses: {misses}, References: {refs}", flush=True)
         return [misses, refs, b_misses, b_loads, instructions, cycles]
     else:
         print(f"[PID {pid}] Error: error in fetching cache metrics for pid {pid}")
@@ -47,13 +49,13 @@ def get_pids(namespaces):
     all_pids  = []
     try:
         for n in namespaces:
-            print("CHECKING NAMESPACE: "+n)
+            #print("CHECKING NAMESPACE: "+n)
             # gets pod ids
             pod_cmd = ["crictl", "pods", "-q", "--namespace", n] # gets all pod ids in a namespace
             cmd_output = subprocess.run(pod_cmd, capture_output=True, text=True).stdout
             pod_ids = cmd_output.splitlines()
             if(len(pod_ids) == 0):
-                print("NO RUNNING PODS FOUND")
+                #print("NO RUNNING PODS FOUND")
                 continue
             for pod_id in pod_ids:
                 #print("POD ID:"+pod_id)
@@ -68,7 +70,7 @@ def get_pids(namespaces):
                     pids = subprocess.run(pid_cmd, capture_output=True, text=True).stdout
                     js = json.loads(pids)
                     pid = js["info"]["pid"]
-                    print("PID:"+str(pid))
+                    #print("PID:"+str(pid))
                     all_pids.append(str(pid))
 
         return all_pids
@@ -97,6 +99,13 @@ print("prometheus client started on port 8000")
 monitored_namespaces = ["test-space", "spectre-victim"] # namespaces to monitor
 
 prev_min = 0
+curr_model = None
+curr_stdev = 0
+
+remodel = True
+anomaly_ratios = []
+anomaly_count = 0
+non_anomaly = 0
 while(1):
     pids = get_pids(monitored_namespaces)
     if pids == -1:
@@ -120,9 +129,40 @@ while(1):
             # runs model rebuild every 60s
             uptime = time.time() - POD_START_TIME
             minute = uptime // 60
-            if minute > prev_min:
-                detector.get_model_data(pid)
+            if minute > prev_min and remodel == True:
+                curr_model, curr_stdev = detector.build_model(pid)
                 prev_min = minute
+            
+            if minute > 0:
+                vals = [references, i_per_c, branch_ratio]
+                if detector.is_anomaly(vals, curr_model, curr_stdev, misses):
+                    print("[ANOMALY DETECTED] Possibly Dangerous Cache Behaviour", flush=True)
+                    anomaly_ratios.append(cache_ratio)
+                    remodel = False
+                    anomaly_count += 1
+                    non_anomaly = 0
+                elif remodel == False:
+                    non_anomaly += 1
+
+                if non_anomaly > 10:
+                    print("[CLEARED] Investigated signal was not an attack", flush=True)
+                    remodel = True
+                    non_anomaly = 0
+                    anomaly_ratios = []
+                    anomaly_count = 0
+                
+                if anomaly_count == 20:
+                    stdev = statistics.stdev(anomaly_ratios)
+                    print(f"Anomolous measuremnnts standard deviation: {stdev}")
+                    if float(stdev) < 0.01:
+                        print("[ATTACK DETECTED] Severe Cache Side Channel Attack Detected", flush=True)
+                        exit(1)
+                    else:
+                        print("[CLEARED] Investigated signal was not an attack", flush=True)
+                        remodel = True
+                        non_anomaly = 0
+                        anomaly_ratios = []
+                        anomaly_count = 0
 
             LLC_MISSES.labels(pid=pid).set(misses)
             LLC_REFS.labels(pid=pid).set(references)
