@@ -19,6 +19,8 @@ RUN pip install scikit-learn
 # skips binary with kernel checks throwing errors
 RUN ln -sf /usr/lib/linux-tools/*/perf /usr/bin/perf 
 
+RUN mkdir collector-config
+
 COPY collector.py /app/collector.py
 COPY crictl.yaml /etc/crictl.yaml
 COPY detector.py /app/detector.py

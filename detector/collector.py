@@ -173,7 +173,10 @@ I_PER_C = Gauge('instructions_per_cycle', 'ratio of instructions:cycles for pid'
 start_http_server(8000) # start metric server
 print("prometheus client started on port 8000")
 
-monitored_namespaces = ["test-space", "spectre-victim"] # namespaces to monitor
+# fetches config from file mounted to container
+with open('collector-config/perf-config', 'r') as file:
+    monitored_namespaces = [line.strip() for line in file]
+print(f"Namespaces Monitored: {monitored_namespaces}") # namespaces to monitor
 
 prev_min = 0
 curr_models = {}
