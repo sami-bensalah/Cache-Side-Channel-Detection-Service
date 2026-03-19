@@ -2,10 +2,13 @@ import subprocess
 import re
 import json
 import time
+import os
 from prometheus_client import start_http_server, Gauge
 from sklearn.linear_model import LinearRegression # type: ignore
 import statistics
 import collections
+from concurrent.futures import ThreadPoolExecutor
+
 
 import detector
 
@@ -17,7 +20,7 @@ def get_llc_misses(pid):
     output = subprocess.run(cmd, capture_output=True, text=True).stderr
     
     if "<not counted>" in output:
-        print(f"[PID {pid}] Warning: no metrics collected (<not counted>)")
+        #print(f"[PID {pid}] Warning: no metrics collected (<not counted>)", flush=True)
         return -1
     
     miss_match = re.search(r'([\d,]+)\s+cache-misses', output)
@@ -42,7 +45,7 @@ def get_llc_misses(pid):
         print(f"[PID {pid}] Misses: {misses}, References: {refs}", flush=True)
         return [misses, refs, b_misses, b_loads, instructions, cycles]
     else:
-        print(f"[PID {pid}] Error: error in fetching cache metrics for pid {pid}")
+        print(f"[PID {pid}] Error: error in fetching cache metrics for pid {pid}", flush=True)
         return -1
 
 
@@ -81,6 +84,69 @@ def get_pids(namespaces):
         return -1
     
 
+def collect_detect(pid, minute):
+    metrics = get_llc_misses(pid)
+    if metrics != -1:
+        misses = metrics[0]
+        references = metrics[1]
+        b_misses = metrics[2]
+        b_loads = metrics[3]
+        instructions = metrics[4]
+        cycles = metrics[5]
+        
+        cache_ratio = misses/references
+        branch_ratio = b_misses/b_loads
+        i_per_c = instructions/cycles
+
+        
+        if minute > 0 and pid in curr_models:
+            vals = [references, i_per_c, branch_ratio]
+            if detector.is_anomaly(vals, curr_models[pid], curr_stdevs[pid], misses):
+                print(f"[PID {pid}][ANOMALY DETECTED] Possibly Dangerous Cache Behaviour", flush=True)
+                pid_anomalies[pid].append(cache_ratio)
+                remodel_status[pid] = False
+                pid_anomaly_count[pid] += 1
+                pid_non_anomaly_count[pid] = 0
+            elif remodel_status[pid] == False:
+                pid_non_anomaly_count[pid] += 1
+
+            if pid_non_anomaly_count[pid] > 10:
+                print(f"[PID {pid}][CLEARED] Investigated signal was not an attack", flush=True)
+                remodel_status[pid] = True
+                pid_anomalies[pid] = []
+                pid_non_anomaly_count[pid] = 0
+                pid_anomaly_count[pid] = 0
+            
+            if pid_anomaly_count[pid] >= 20:
+                stdev = statistics.stdev(pid_anomalies[pid])
+                print(f"[PID {pid}] Anomolous measuremnnts standard deviation: {stdev}")
+                if float(stdev) < 0.01:
+                    print(f"[PID {pid}][ATTACK DETECTED] Severe Cache Side Channel Attack Detected", flush=True)
+                    os._exit(1)
+                else:
+                    print(f"[PID {pid}][CLEARED] Investigated signal was not an attack", flush=True)
+                    remodel_status[pid] = True
+                    pid_anomalies[pid] = []
+                    pid_non_anomaly_count[pid] = 0
+                    pid_anomaly_count[pid] = 0
+
+                    curr_models[pid], curr_stdevs[pid] = detector.build_model(pid)
+        else:
+            print(f"[PID {pid}] No Model Available Yet", flush=True)
+
+        LLC_MISSES.labels(pid=pid).set(misses)
+        LLC_REFS.labels(pid=pid).set(references)
+        LLC_RATIO.labels(pid=pid).set(cache_ratio)
+
+        LLC_B_MISSES.labels(pid=pid).set(b_misses)
+        LLC_B_LOADS.labels(pid=pid).set(b_loads)
+        LLC_B_RATIO.labels(pid=pid).set(branch_ratio)
+
+        I_COUNT.labels(pid=pid).set(instructions)
+        CYCLES.labels(pid=pid).set(cycles)
+        I_PER_C.labels(pid=pid).set(i_per_c)
+
+
 # prom metrics - metric name, description, label
 LLC_MISSES = Gauge('llc_cache_misses', 'LLC misses per PID', ['pid'])
 LLC_REFS = Gauge('llc_cache_references', 'LLC references per PID', ['pid'])
@@ -107,10 +173,9 @@ remodel_status = collections.defaultdict(lambda: True)
 
 pid_anomalies = collections.defaultdict(list)
 
-anomaly_count = 0
-non_anomaly = 0
 pid_anomaly_count = collections.defaultdict(int)
 pid_non_anomaly_count = collections.defaultdict(int)
+
 
 while(1):
     pids = get_pids(monitored_namespaces)
@@ -118,75 +183,16 @@ while(1):
         break
     if pids == []:
         print("no pods to track in the targeted namespace")
-    
-    # runs model rebuild every 60s
-    uptime = time.time() - POD_START_TIME
-    minute = uptime // 60
+    else:
+        # runs model rebuild every 60s
+        uptime = time.time() - POD_START_TIME
+        minute = uptime // 60
 
-    # builds new models
-    for pid in pids:
-        if minute > prev_min and remodel_status[pid] == True:
-            curr_models[pid], curr_stdevs[pid] = detector.build_model(pid)
-    prev_min = minute
+        # builds new models
+        for pid in pids:
+            if minute > prev_min and remodel_status[pid] == True:
+                curr_models[pid], curr_stdevs[pid] = detector.build_model(pid)
+        prev_min = minute
 
-    for pid in pids:
-        metrics = get_llc_misses(pid)
-        if metrics != -1:
-            misses = metrics[0]
-            references = metrics[1]
-            b_misses = metrics[2]
-            b_loads = metrics[3]
-            instructions = metrics[4]
-            cycles = metrics[5]
-            
-            cache_ratio = misses/references
-            branch_ratio = b_misses/b_loads
-            i_per_c = instructions/cycles
-
-            
-            if minute > 0 and pid in curr_models:
-                vals = [references, i_per_c, branch_ratio]
-                if detector.is_anomaly(vals, curr_models[pid], curr_stdevs[pid], misses):
-                    print(f"[PID {pid}][ANOMALY DETECTED] Possibly Dangerous Cache Behaviour", flush=True)
-                    pid_anomalies[pid].append(cache_ratio)
-                    remodel_status[pid] = False
-                    pid_anomaly_count[pid] += 1
-                    pid_non_anomaly_count[pid] = 0
-                elif remodel_status[pid] == False:
-                    pid_non_anomaly_count[pid] += 1
-
-                if pid_non_anomaly_count[pid] > 10:
-                    print(f"[PID {pid}][CLEARED] Investigated signal was not an attack", flush=True)
-                    remodel_status[pid] = True
-                    pid_anomalies[pid] = []
-                    pid_non_anomaly_count[pid] = 0
-                    pid_anomaly_count[pid] = 0
-                
-                if pid_anomaly_count[pid] >= 20:
-                    stdev = statistics.stdev(pid_anomalies[pid])
-                    print(f"[PID {pid}] Anomolous measuremnnts standard deviation: {stdev}")
-                    if float(stdev) < 0.01:
-                        print(f"[PID {pid}][ATTACK DETECTED] Severe Cache Side Channel Attack Detected", flush=True)
-                        exit(1)
-                    else:
-                        print(f"[PID {pid}][CLEARED] Investigated signal was not an attack", flush=True)
-                        remodel_status[pid] = True
-                        pid_anomalies[pid] = []
-                        pid_non_anomaly_count[pid] = 0
-                        pid_anomaly_count[pid] = 0
-
-                        curr_models[pid], curr_stdevs[pid] = detector.build_model(pid)
-            else:
-                print(f"[PID {pid}] No Model Available Yet", flush=True)
-
-            LLC_MISSES.labels(pid=pid).set(misses)
-            LLC_REFS.labels(pid=pid).set(references)
-            LLC_RATIO.labels(pid=pid).set(cache_ratio)
-
-            LLC_B_MISSES.labels(pid=pid).set(b_misses)
-            LLC_B_LOADS.labels(pid=pid).set(b_loads)
-            LLC_B_RATIO.labels(pid=pid).set(branch_ratio)
-
-            I_COUNT.labels(pid=pid).set(instructions)
-            CYCLES.labels(pid=pid).set(cycles)
-            I_PER_C.labels(pid=pid).set(i_per_c)
+        with ThreadPoolExecutor(max_workers=(len(pids))) as executor:
+            executor.map(lambda p: collect_detect(p, minute), pids)
