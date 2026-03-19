@@ -1,5 +1,6 @@
 import requests
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression # type: ignore
+import statistics
 
 # prom service internal cluster URL
 PROM_URL = "http://prometheus.collector.svc.cluster.local:9090/api/v1/query"
@@ -42,6 +43,14 @@ def build_model(pid):
     y = metric_data["llc_cache_misses"] 
     
     model = LinearRegression().fit(X, y)
-    print(f"Model Accuracy (R^2): {model.score(X, y):.4f}")
+    
+    stdev = statistics.stdev(metric_data["llc_cache_misses"])
+    print(f"Model Accuracy (R^2): {model.score(X, y):.4f}, Standard Dev: {stdev}")
+    return model, stdev
 
-    return model
+def is_anomaly(metrics, model, stdev, actual_misses):
+    predicted_misses = model.predict([metrics])[0]
+    diff = abs(actual_misses - predicted_misses)
+    if diff > (3 * stdev):
+        return True
+    return False
