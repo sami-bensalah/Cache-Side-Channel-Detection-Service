@@ -9,13 +9,12 @@ import statistics
 import collections
 from concurrent.futures import ThreadPoolExecutor
 
-
 import detector
+
 
 POD_START_TIME = time.time()
 
-
-def get_llc_misses(pid):
+def get_llc_metrics(pid):
     cmd = ["perf", "stat", "-e", "cache-misses,cache-references,branch-loads,branch-misses,cycles,instructions", "-p",str(pid), "sleep", "1"]
     output = subprocess.run(cmd, capture_output=True, text=True).stderr
     
@@ -23,15 +22,19 @@ def get_llc_misses(pid):
         #print(f"[PID {pid}] Warning: no metrics collected (<not counted>)", flush=True)
         return -1
     
+    # gets llc miss / refs
     miss_match = re.search(r'([\d,]+)\s+cache-misses', output)
     ref_match = re.search(r'([\d,]+)\s+cache-references', output)
 
+    # gets branch misses / loads
     b_miss_match = re.search(r'([\d,]+)\s+branch-misses', output)
     b_loads_match = re.search(r'([\d,]+)\s+branch-loads', output)
 
+    # gets cpu cycles / instructions
     instructions_match = re.search(r'([\d,]+)\s+instructions', output)
     cycles_match = re.search(r'([\d,]+)\s+cycles', output)
 
+    # parses and gets val
     if miss_match and ref_match and b_miss_match and b_loads_match:
         misses = int(miss_match.group(1).replace(',', ''))
         refs = int(ref_match.group(1).replace(',', ''))
@@ -85,7 +88,7 @@ def get_pids(namespaces):
     
 
 def collect_detect(pid, minute):
-    metrics = get_llc_misses(pid)
+    metrics = get_llc_metrics(pid) # get metrics
     if metrics != -1:
         misses = metrics[0]
         references = metrics[1]
@@ -98,19 +101,23 @@ def collect_detect(pid, minute):
         branch_ratio = b_misses/b_loads
         i_per_c = instructions/cycles
 
-        
+        # if pid has model and collector is older than 1 min
         if minute > 0 and pid in curr_models:
             vals = [references, i_per_c, branch_ratio]
+
+            # check if current metrics readings are anomalous
             if detector.is_anomaly(vals, curr_models[pid], curr_stdevs[pid], misses):
                 print(f"[PID {pid}][ANOMALY DETECTED] Possibly Dangerous Cache Behaviour", flush=True)
                 pid_anomalies[pid].append(cache_ratio)
-                remodel_status[pid] = False
+                remodel_status[pid] = False # block new model from being generated
                 pid_anomaly_count[pid] += 1
                 pid_non_anomaly_count[pid] = 0
             elif remodel_status[pid] == False:
+                # if readings are normal add to counter to free current model block
                 pid_non_anomaly_count[pid] += 1
 
             if pid_non_anomaly_count[pid] > 10:
+                # if 10 normal readings recorded in a row continue as normal 
                 print(f"[PID {pid}][CLEARED] Investigated signal was not an attack", flush=True)
                 remodel_status[pid] = True
                 pid_anomalies[pid] = []
@@ -118,12 +125,14 @@ def collect_detect(pid, minute):
                 pid_anomaly_count[pid] = 0
             
             if pid_anomaly_count[pid] >= 20:
+                # if more than 20 anomalous recordings calc stdev and check consistency
                 stdev = statistics.stdev(pid_anomalies[pid])
-                print(f"[PID {pid}] Anomolous measuremnnts standard deviation: {stdev}")
+                print(f"[PID {pid}] Anomolous measurements's standard deviation: {stdev}")
                 if float(stdev) < 0.01:
                     print(f"[PID {pid}][ATTACK DETECTED] Severe Cache Side Channel Attack Detected", flush=True)
                     os._exit(1)
                 else:
+                    # anomalous readings were not caused by side channel attack
                     print(f"[PID {pid}][CLEARED] Investigated signal was not an attack", flush=True)
                     remodel_status[pid] = True
                     pid_anomalies[pid] = []
@@ -134,6 +143,7 @@ def collect_detect(pid, minute):
         else:
             print(f"[PID {pid}] No Model Available Yet", flush=True)
 
+        # push readings into prom
         LLC_MISSES.labels(pid=pid).set(misses)
         LLC_REFS.labels(pid=pid).set(references)
         LLC_RATIO.labels(pid=pid).set(cache_ratio)
@@ -194,5 +204,6 @@ while(1):
                 curr_models[pid], curr_stdevs[pid] = detector.build_model(pid)
         prev_min = minute
 
+        # run thread for each pid
         with ThreadPoolExecutor(max_workers=(len(pids))) as executor:
             executor.map(lambda p: collect_detect(p, minute), pids)
