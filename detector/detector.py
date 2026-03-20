@@ -23,7 +23,7 @@ def get_model_data(pid):
     
     return metric_data
 
-def build_model(pid):
+def build_model(pid, pod_name):
     metric_data = get_model_data(pid)
 
     # zip metrics together to create points [a, b, c] -> [refs, ipc, branch_ratio]
@@ -33,7 +33,7 @@ def build_model(pid):
     model = LinearRegression().fit(X, y) # build model
     
     stdev = statistics.stdev(metric_data["llc_cache_misses"]) # get stdev
-    print(f"[PID {pid}] Model Accuracy (R^2): {model.score(X, y):.4f}, Standard Dev: {stdev}")
+    print(f"[MODEL INFO][PID {pid}] Model Accuracy: {model.score(X, y):.4f} | StdDev: {stdev} | POD: {pod_name}")
     return model, stdev
 
 def is_anomaly(metrics, model, stdev, actual_misses):

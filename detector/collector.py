@@ -45,12 +45,12 @@ def get_llc_metrics(pid):
         instructions = int(instructions_match.group(1).replace(',', ''))
         cycles = int(cycles_match.group(1).replace(',', ''))
 
-        print(f"[PID {pid}] Misses: {misses}, References: {refs}", flush=True)
+        print(f"[CACHE INFO][PID {pid}] Misses: {misses} | References: {refs}", flush=True)
         pid_data_count[pid] += 1
 
         return [misses, refs, b_misses, b_loads, instructions, cycles]
     else:
-        print(f"[PID {pid}] Error: error in fetching cache metrics for pid {pid}", flush=True)
+        print(f"[PID {pid}][POD {pid_pod_name[pid]}] Error: error in fetching cache metrics for pid {pid}", flush=True)
         return -1
 
 
@@ -68,6 +68,11 @@ def get_pids(namespaces):
                 continue
             for pod_id in pod_ids:
                 #print("POD ID:"+pod_id)
+                # get pod name
+                pod_name_cmd = ["crictl", "pods", "--id", pod_id, "-o", "json"]
+                result = subprocess.run(pod_name_cmd, capture_output=True, text=True)
+                data = json.loads(result.stdout)
+                pod_name = data['items'][0]['metadata']['name']
                 # gets container ids in pod
                 cntr_cmd = ["crictl", "ps", "--pod", pod_id, "-q"]
                 cntr_output = subprocess.run(cntr_cmd, capture_output=True, text=True).stdout
@@ -81,6 +86,7 @@ def get_pids(namespaces):
                     pid = js["info"]["pid"]
                     #print("PID:"+str(pid))
                     all_pids.append(str(pid))
+                    pid_pod_name[str(pid)] = pod_name
 
         return all_pids
     except Exception as e:
@@ -109,7 +115,7 @@ def collect_detect(pid, minute):
 
             # check if current metrics readings are anomalous
             if detector.is_anomaly(vals, curr_models[pid], curr_stdevs[pid], misses):
-                print(f"[PID {pid}][ANOMALY DETECTED] Possibly Dangerous Cache Behaviour", flush=True)
+                print(f"[ANOMALY DETECTED][PID {pid}] Possibly Dangerous Cache Behaviour | POD: {pid_pod_name[pid]}", flush=True)
                 pid_anomalies[pid].append(cache_ratio)
                 remodel_status[pid] = False # block new model from being generated
                 pid_anomaly_count[pid] += 1
@@ -120,7 +126,7 @@ def collect_detect(pid, minute):
 
             if pid_non_anomaly_count[pid] > 10:
                 # if 10 normal readings recorded in a row continue as normal 
-                print(f"[PID {pid}][CLEARED] Investigated signal was not an attack", flush=True)
+                print(f"[CLEARED][PID {pid}] Investigated signal was not an attack | POD: {pid_pod_name[pid]}", flush=True)
                 remodel_status[pid] = True
                 pid_anomalies[pid] = []
                 pid_non_anomaly_count[pid] = 0
@@ -129,19 +135,19 @@ def collect_detect(pid, minute):
             if pid_anomaly_count[pid] >= 20:
                 # if more than 20 anomalous recordings calc stdev and check consistency
                 stdev = statistics.stdev(pid_anomalies[pid])
-                print(f"[PID {pid}] Anomolous measurements's standard deviation: {stdev}")
+                print(f"[INFO][PID {pid}] Anomolous measurements's standard deviation: {stdev} | POD: {pid_pod_name[pid]}")
                 if float(stdev) < 0.01:
-                    print(f"[PID {pid}][ATTACK DETECTED] Severe Cache Side Channel Attack Detected", flush=True)
+                    print(f"[ATTACK DETECTED][PID {pid}] Severe Cache Side Channel Attack Detected | POD: {pid_pod_name[pid]}", flush=True)
                     os._exit(1)
                 else:
                     # anomalous readings were not caused by side channel attack
-                    print(f"[PID {pid}][CLEARED] Investigated signal was not an attack", flush=True)
+                    print(f"[CLEARED][PID {pid}] Investigated signal was not an attack | POD: {pid_pod_name[pid]}", flush=True)
                     remodel_status[pid] = True
                     pid_anomalies[pid] = []
                     pid_non_anomaly_count[pid] = 0
                     pid_anomaly_count[pid] = 0
 
-                    curr_models[pid], curr_stdevs[pid] = detector.build_model(pid)
+                    curr_models[pid], curr_stdevs[pid] = detector.build_model(pid, pid_pod_name[pid])
         #else:
             #print(f"[PID {pid}] No Model Available Yet", flush=True)
 
@@ -194,6 +200,8 @@ pid_non_anomaly_count = collections.defaultdict(int)
 # check if pid has data in last 60s
 pid_data_count = collections.defaultdict(int)
 
+pid_pod_name = {}
+
 while(1):
     pids = get_pids(monitored_namespaces)
     if pids == -1:
@@ -210,10 +218,10 @@ while(1):
             for pid in pids:
                 if remodel_status[pid] == True:
                     if pid_data_count[pid] > 0:
-                        curr_models[pid], curr_stdevs[pid] = detector.build_model(pid)
+                        curr_models[pid], curr_stdevs[pid] = detector.build_model(pid, pid_pod_name[pid])
                         pid_data_count[pid] = 0
                     else:
-                        print(f"[PID {pid}][BUILD WARNING] not enough data points no model built")
+                        print(f"[BUILD WARNING][PID {pid}] not enough data points no model built | POD: {pid_pod_name[pid]}")
             prev_min = minute
 
         # run thread for each pid
