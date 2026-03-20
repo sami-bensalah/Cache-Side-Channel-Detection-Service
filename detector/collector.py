@@ -35,7 +35,7 @@ def get_llc_metrics(pid):
     cycles_match = re.search(r'([\d,]+)\s+cycles', output)
 
     # parses and gets val
-    if miss_match and ref_match and b_miss_match and b_loads_match:
+    if miss_match and ref_match and b_miss_match and b_loads_match and cycles_match and instructions_match:
         misses = int(miss_match.group(1).replace(',', ''))
         refs = int(ref_match.group(1).replace(',', ''))
         
@@ -46,6 +46,8 @@ def get_llc_metrics(pid):
         cycles = int(cycles_match.group(1).replace(',', ''))
 
         print(f"[PID {pid}] Misses: {misses}, References: {refs}", flush=True)
+        pid_data_count[pid] += 1
+
         return [misses, refs, b_misses, b_loads, instructions, cycles]
     else:
         print(f"[PID {pid}] Error: error in fetching cache metrics for pid {pid}", flush=True)
@@ -140,8 +142,8 @@ def collect_detect(pid, minute):
                     pid_anomaly_count[pid] = 0
 
                     curr_models[pid], curr_stdevs[pid] = detector.build_model(pid)
-        else:
-            print(f"[PID {pid}] No Model Available Yet", flush=True)
+        #else:
+            #print(f"[PID {pid}] No Model Available Yet", flush=True)
 
         # push readings into prom
         LLC_MISSES.labels(pid=pid).set(misses)
@@ -189,6 +191,8 @@ pid_anomalies = collections.defaultdict(list)
 pid_anomaly_count = collections.defaultdict(int)
 pid_non_anomaly_count = collections.defaultdict(int)
 
+# check if pid has data in last 60s
+pid_data_count = collections.defaultdict(int)
 
 while(1):
     pids = get_pids(monitored_namespaces)
@@ -202,10 +206,15 @@ while(1):
         minute = uptime // 60
 
         # builds new models
-        for pid in pids:
-            if minute > prev_min and remodel_status[pid] == True:
-                curr_models[pid], curr_stdevs[pid] = detector.build_model(pid)
-        prev_min = minute
+        if minute > prev_min:
+            for pid in pids:
+                if remodel_status[pid] == True:
+                    if pid_data_count[pid] > 0:
+                        curr_models[pid], curr_stdevs[pid] = detector.build_model(pid)
+                        pid_data_count[pid] = 0
+                    else:
+                        print(f"[PID {pid}][BUILD WARNING] not enough data points no model built")
+            prev_min = minute
 
         # run thread for each pid
         with ThreadPoolExecutor(max_workers=(len(pids))) as executor:
