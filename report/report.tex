@@ -1,0 +1,68 @@
+\documentclass[11pt,a4paper, notitlepage]{article}
+
+% --- Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{graphicx}
+\usepackage{amsmath} 
+\usepackage{listings} 
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+\usepackage{titlesec}
+\usepackage{titling}
+\setlength{\droptitle}{-2cm}
+\hypersetup{breaklinks=true}
+
+% --- Document Info ---
+\title{Detecting Cache Side-Channel Attacks in Multi-tenant OpenShift Environments}
+\author{Sami Bensalah}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\begin{abstract}
+\footnotesize
+This report describes the design, implementation and deployment of a cache side-channel attack detection service on a Red Hat OpenShift (RHOCP) cluster and investigates its effectiveness for defending against cross-tenant cloud attacks. I describe the development and effectiveness of a Prime+Probe attack on the LLC enabled by a spectre v1 (bounds check bypass) side-channel vulnerability in a targeted victim server and outline an implementation for a system to reliably and accurately detecting these attacks based on microarchitectural telemetry.
+\end{abstract}
+
+
+
+\section{Introduction}
+\subsection{Motivation}
+\subsubsection{Public Cloud Vulnerability}
+While OpenShift and all host cloud platforms provide logical isolation and hardware virtualisation, the underlying CPU cache remains a shared resource across all processes. Many cloud platforms are able to offer significantly cheaper cloud infrastructure by partitioning a single powerful server into various logically seperated tenant spaces, creating a multi-tenant cloud environment. This method of divying out server resources gave rise to the public cloud architecture used by the majority of enterprises, and though cloud security concerns for public cloud has been raised leading to the now wider application of hybrid cloud some businesses still have vulnerable services running on environments susceptible to cross-tenant cloud attacks.
+\subsubsection{Mitigation Effectiveness and Performance}
+The discovery of spectre and meltdown attacks in 2018 and subsequent attacks resulted in CPU manufacturers and OS distributors scrambling to introduce mitigations through software patches and hardware-level blocks. Though the ability for meltdown to function has been practically removed by these mitigations, spectre variants still pose a serious risk. The main reason for this being that speculative execution is an inherent part of modern CPU architecture, removing speculation would reduce CPU throughput drastically. 
+
+Variants of spectre require different targeted mitigations which makes them so hard to prevent, particularly spectre v1 bounds check bypass. They have various linux kernel level mitigations currently available, such as Indirect Branch Prediction Barrier (IBPB), Single Thread Indirect Branch Predictors (STIBP) and LFENCE (v1 specific). However, as outlined in the Linux kernel documentation `the protections are put in place on a case by case basis, and there is no guarantee that all possible attack vectors for spectre variant 1 are covered'~\cite{kernel_spectre}. In the case of spectre v1, the main mitigation strategy is defensive programming and inserting LFENCEs before vulnerable branches, however, in certain constrained systems constant instruction fences are not feasible, leading to extremely vulnerable processes being in production. 
+
+This performance degradation was also noted by Red Hat with their own kernel patches where they mentioned ``These patches are enabled by default because Red Hat prioritizes out of the box security. Speculative execution is a performance optimization technique which these updates change (both kernel and microcode) and may result in workload-specific performance degradation."~\cite{redhat2019}. Despite this 'security-first' default, the performance penalty is severe enough that Red Hat and the Linux kernel provide mechanisms to bypass these protections. Resulting in various insecure environments possibly running with no mitigations enabled in the cloud.
+
+\subsubsection{OpenShift Clusters}
+OpenShift clusters are an industry standard method of deploying applications onto cloud infrastructure securely and effectively, with ``50\% of the top Fortune 100 companies are using Red Hat OpenShift" \cite{openshift_usage}. This huge client base results in a large number of services running on these clusters, and in very few cases are the clusters not hosted on a type of cloud infrastructure. As discussed previously, this leads to the possibility of being a target of a side-channel attack.
+
+\subsection{Problem Definition}
+My motivation leads me to my approach for this project, which is to detect if a cache side-channel has occurred on any monitored service within the RHOCP cluster. My solution is to rather than employ hard counters to the attacks, such as the mitigations for Spectre, we instead employ a soft mitigation strategy, which involves a sophisticated detector sending a trustable trigger if an attack is occuring live and then performing the necessary mitigations, such as moving a service onto a different node running on a seperate physical machine or killing the container. This removes the need to decide between prioritising performance over security and allows a more widely usable mitigation strategy.
+
+
+\begin{thebibliography}{9}
+
+\bibitem{kernel_spectre}
+Linux Kernel Organization, 
+``Spectre Side Channels,'' 
+\emph{The Linux Kernel Administration Guide}, 2024. [Online]. Available: \url{https://docs.kernel.org/admin-guide/hw-vuln/spectre.html}
+
+\bibitem{redhat2019}
+Red Hat Customer Portal, 
+``Controlling the Impact of Speculative Execution Vulnerabilities,'' 
+2020. [Online]. Available: \url{https://access.redhat.com/articles/3311301}
+
+\bibitem{openshift_usage}
+Red Hat, 
+``More Than 1,000 Enterprises Across the Globe Adopt Red Hat OpenShift Container Platform to Power Business Applications'' 
+2019. [Online]. Available: \url{https://www.redhat.com/en/about/press-releases/more-1000-enterprises-across-globe-adopt-red-hat-openshift-container-platform-power-business-applications}
+\end{thebibliography}
+
+\end{document}
