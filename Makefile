@@ -13,14 +13,14 @@ SPECTRE_FLAGS := \
 	-fno-pie
 
 VICTIM_FILE = victim-service/victim.c 
-L1_ATTACKER_FILE = attacker-spy-service/attacker-spy.c
+L1_ATTACKER_FILE = l1-attacker/attacker-spy.c
 LLC_A_FILE  = LLC-attacker/attacker.c
 RHOCP_A_FILE = RHOCP-attacker/cloud-attacker.c
 NOISE_FILE = detector/server-noise.c
 CFILES = $(VICTIM_FILE) $(L1_ATTACKER_FILE) $(LLC_A_FILE) $(RHOCP_A_FILE) $(NOISE_FILE)
 
 V_OBJS = victim-service/victim.o
-L1_A_OBJS = attacker-spy-service/attacker-spy.o
+L1_A_OBJS = l1-attacker/attacker-spy.o
 LLC_A_OBJS = LLC-attacker/attacker.o
 RHOCP_A_OBJS = RHOCP-attacker/cloud-attacker.o
 NOISE_OBJS = detector/server-noise.o
