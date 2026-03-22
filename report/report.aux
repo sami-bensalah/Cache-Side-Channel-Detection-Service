@@ -9,9 +9,43 @@
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {1.1.1}Public Cloud Vulnerability}{1}{subsubsection.1.1.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {1.1.2}Mitigation Effectiveness and Performance}{1}{subsubsection.1.1.2}\protected@file@percent }
 \citation{openshift_usage}
-\bibcite{kernel_spectre}{1}
-\bibcite{redhat2019}{2}
-\bibcite{openshift_usage}{3}
+\citation{arm_architecture}
+\citation{arm_architecture}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {1.1.3}OpenShift Clusters}{2}{subsubsection.1.1.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.2}Problem Definition}{2}{subsection.1.2}\protected@file@percent }
-\gdef \@abspage@last{2}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Project Background}{2}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Cache Structure and Mapping}{2}{subsection.2.1}\protected@file@percent }
+\newlabel{sec:cache_structure}{{2.1}{2}{Cache Structure and Mapping}{subsection.2.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Tag, Index, and Offset bits of a physical memory address for cache mapping \cite  {arm_architecture}}}{2}{figure.1}\protected@file@percent }
+\newlabel{fig:cache_mapping}{{1}{2}{Tag, Index, and Offset bits of a physical memory address for cache mapping \cite {arm_architecture}}{figure.1}{}}
+\citation{spectre_og}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Microarchitectural cache specifications of the lab cluster node.}}{3}{table.1}\protected@file@percent }
+\newlabel{tab:cache_specs_grid}{{1}{3}{Microarchitectural cache specifications of the lab cluster node}{table.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Spectre V1 (Bounds Check Bypass)}{3}{subsection.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Cache Timing Side-Channels}{3}{subsection.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.3.1}Flush+Reload}{3}{subsubsection.2.3.1}\protected@file@percent }
+\citation{prime_probe_img}
+\citation{prime_probe_img}
+\bibcite{kernel_spectre}{1}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.3.2}Prime+Probe on L1 and Last Level Cache LLC}{4}{subsubsection.2.3.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Prime + Probe cache attacks. The timing difference (cache hits or cache misses) discloses the victim's access pattern. \cite  {prime_probe_img}}}{4}{figure.2}\protected@file@percent }
+\newlabel{fig:prime_probe}{{2}{4}{Prime + Probe cache attacks. The timing difference (cache hits or cache misses) discloses the victim's access pattern. \cite {prime_probe_img}}{figure.2}{}}
+\bibcite{redhat2019}{2}
+\bibcite{openshift_usage}{3}
+\bibcite{arm_architecture}{4}
+\bibcite{spectre_og}{5}
+\bibcite{primeprobe}{6}
+\bibcite{prime_probe_img}{7}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}OpenShift}{5}{subsection.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5}PMU and Hardware Counters}{5}{subsection.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Methodology}{5}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Attack Framework}{5}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Detection Logic and Threshold Analysis}{5}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Implementation}{5}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Detection Service}{5}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Spectre Gadget}{5}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.1}Flush+Reload Validation}{5}{subsubsection.4.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Prime+Probe Implementation}{5}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.1}L1 Targeting}{5}{subsubsection.4.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.2}Last Level Cache Targeting}{5}{subsubsection.4.3.2}\protected@file@percent }
+\gdef \@abspage@last{5}
