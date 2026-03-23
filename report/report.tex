@@ -25,7 +25,7 @@
 \maketitle
 \begin{abstract}
 \footnotesize
-This report describes the design, implementation and deployment of a cache side-channel attack detection service on a Red Hat OpenShift (RHOCP) cluster and investigates its effectiveness for defending against cross-tenant cloud attacks. I describe the development and effectiveness of a Prime+Probe attack on the LLC enabled by a spectre v1 (bounds check bypass) side-channel vulnerability in a targeted victim server and outline an implementation for a system to reliably and accurately detecting these attacks based on microarchitectural telemetry.
+This report describes the design, implementation and deployment of a cache side-channel attack detection service on a RHOCP (Red Hat OpenShift Container Platform) cluster and investigates its effectiveness for defending against cross-tenant cloud attacks. I describe the development and effectiveness of a Prime+Probe attack on the LLC enabled by a spectre v1 (bounds check bypass) side-channel vulnerability in a targeted victim server and outline an implementation for a system to reliably and accurately detecting these attacks based on microarchitectural telemetry.
 \end{abstract}
 
 
@@ -35,7 +35,7 @@ This report describes the design, implementation and deployment of a cache side-
 \subsubsection{Public Cloud Vulnerability}
 While OpenShift and all host cloud platforms provide logical isolation and hardware virtualisation, the underlying CPU cache remains a shared resource across all processes. Many cloud platforms are able to offer significantly cheaper cloud infrastructure by partitioning a single powerful server into various logically seperated tenant spaces, creating a multi-tenant cloud environment. This method of divying out server resources gave rise to the public cloud architecture used by the majority of enterprises, and though cloud security concerns for public cloud has been raised leading to the now wider application of hybrid cloud some businesses still have vulnerable services running on environments susceptible to cross-tenant cloud attacks.
 \subsubsection{Mitigation Effectiveness and Performance}
-The discovery of spectre and meltdown attacks in 2018 and subsequent attacks resulted in CPU manufacturers and OS distributors scrambling to introduce mitigations through software patches and hardware-level blocks. Though the ability for meltdown to function has been practically removed by these mitigations, spectre variants still pose a serious risk. The main reason for this being that speculative execution is an inherent part of modern CPU architecture, removing speculation would reduce CPU throughput drastically. 
+The discovery of spectre and meltdown in 2018 and subsequent attacks resulted in CPU manufacturers and OS distributors scrambling to introduce mitigations through software patches and hardware-level blocks. Though the ability for meltdown to function has been practically removed by these mitigations, spectre variants still pose a serious risk. The main reason for this being that speculative execution is an inherent part of modern CPU architecture, removing speculation would reduce CPU throughput drastically. 
 
 Variants of spectre require different targeted mitigations which makes them so hard to prevent, particularly spectre v1 bounds check bypass. They have various linux kernel level mitigations currently available, such as Indirect Branch Prediction Barrier (IBPB), Single Thread Indirect Branch Predictors (STIBP) and LFENCE (v1 specific). However, as outlined in the Linux kernel documentation `the protections are put in place on a case by case basis, and there is no guarantee that all possible attack vectors for spectre variant 1 are covered'~\cite{kernel_spectre}. In the case of spectre v1, the main mitigation strategy is defensive programming and inserting LFENCEs before vulnerable branches, however, in certain constrained systems constant instruction fences are not feasible, leading to extremely vulnerable processes being in production. 
 
@@ -45,7 +45,7 @@ This performance degradation was also noted by Red Hat with their own kernel pat
 OpenShift clusters are an industry standard method of deploying applications onto cloud infrastructure securely and effectively, with ``50\% of the top Fortune 100 companies are using Red Hat OpenShift" \cite{openshift_usage}. This huge client base results in a large number of services running on these clusters, and in very few cases are the clusters not hosted on a type of cloud infrastructure. As discussed previously, this leads to the possibility of being a target of a side-channel attack.
 
 \subsection{Problem Definition}
-My motivation leads me to my goal for this project, which is to detect if a cache side-channel has occurred on any monitored service within the RHOCP cluster. The objective is to remove the need to decide between prioritising performance over security and allow a more globally usable mitigation strategy independent of the underlying environment architecture. So, rather than having to employ hard counters to the attacks, such as the software and hardware mitigations for spectre available, we instead employ a soft mitigation strategy, which involves a sophisticated detector sending a trustable signal if an attack is occuring live, to facilitate the triggering of defensive actions, such as moving a service onto a different cluster node running on a seperate physical machine or killing the container. 
+My motivation leads me to my goal for this project, which is to detect if a cache side-channel has occurred on any monitored service within the RHOCP cluster. The objective is to remove the need to decide between prioritising performance over security and allow a more globally usable mitigation strategy independent of the underlying environment architecture. So, rather than having to employ hard counters to the attacks, such as the software and hardware mitigations for spectre available, we instead employ a soft mitigation strategy, which involves a detector leveraging ML models to detect anomalies and send a trustable signal if an attack is occuring live. This is to facilitate the triggering of defensive actions, such as moving a service onto a different cluster node running on a seperate physical machine or killing the victim container. 
 
 \begin{center}
 \rule{0.8\textwidth}{0.4pt} \\ \vspace{0.2cm}
@@ -95,15 +95,14 @@ In contrast, local branch predictors look at each branch instruction individuall
 So, although the architectural state is rolled back when the CPU realises its misprediction, a `ghost' signal or `footprint' is left behind in cache. The code within the branch known as a spectre `gadget' is in place within the victim's vulnerable branchh which is executed post transient execution resulting in a cache mapping which the adversary can predict and infer a set of values from.
 \subsection{Cache Timing Side-Channels}
 A side channel attack is any unintended side effect which can be measured to infer information during a program's execution. In this report I will be discussing side-channel timing attacks specifically which are enabled by the spectre v1 gadget.
-The timing attacks I used are Prime+Probe and Flush+Reload. 
 \subsubsection{Flush+Reload}
-Flush+Reload is a widely used attack with the majority of research papers on spectre employ Flush+Reload as a mechanism to read the cache residue caused by the transient execution.
+Flush+Reload is a widely used attack with the majority of research papers on spectre employ Flush+Reload as a mechanism to read the cache residue caused by the transient execution. This is due to its .
 It involves flushing a target address' data from memory, spectre v1 is then triggered and if the spectre gadget maps to that flushed address it speculatively accesses it. We then perform the reload which is where we measure our timing side-channel, 
-this involves measuring the fetch time using hardware level timers. If the fetch time is under a certain cycle threshold then we can infer that the address, though it was previously flushed, is now in cache, meaning that it was used speculatively, allowing us to infer and steal secret information.
+this involves measuring the fetch time using hardware level timers. If the fetch time is under a certain cycle threshold then we can infer that the address, though it was previously flushed, is now in cache, meaning that it was used speculatively, allowing us to steal secret information.
 
 The issue in applying this attack to cloud systems for cross-tenant attacks is that the adversary requires access to the same memory space to be able to flush, making this attack infeasible on virtualised and logically isolated user spaces. 
 
-\subsubsection{Prime+Probe on L1 and Last Level Cache LLC}
+\subsubsection{Prime+Probe}
 Prime+Probe is a significantly more sophisticated approach in comparison to Flush+Reload as, rather than relying on access to a shared memory space, it instead requires a shared environment on the hardware level only.
 This results in a much more effective method for cross-VM attacks on multi-tenant environments, hence why it has been chosen as the main approach for this project. 
 
@@ -121,11 +120,70 @@ If an address has been evicted then that is classified as a `cache miss' (Step 3
 Cache is inherently noisy and evictions are constantly occurring leading to various misses during system runtime. This also means that the attack will result in various false misses, where the probe phase identifies that an address' data has been replaced, in a quiet system it is most likely due to the victim, however,
 in noisier multi-tenant cloud systems noise will be introduced by a third party, such as other users, kernel activities or other cluster services. This makes Prime+Probe less reliable on noisier systems which in most cases is fixed by increasing the number of repeat runs by 10s of thousands to ensre that the cache signal is true.
 
+In addition, the difficulty of building the eviction set required for the attack increases significantly when shifting from an L1 targeting to an LLC targeting attack due to the sheer size of LLC and the core slicing algorithm employyed by modern processors. The method for which I will discuss in the implementation section of this report.
 
-\subsection{OpenShift}
 \subsection{PMU and Hardware Counters}
+The Performance Monitoring Unit (PMU) refers to a unit within the CPU which collects hardware counters for specific CPU events, which include low level cache activity such as L1-misses, L1-loads, cache-references, branch-misses, instructions, cycles and more.
+These cache event counters are of specific interest for this project and provide a way to effectively investigate performance profiling and debugging. The PMU is used by various performance analysis tools and in this study I will employing the use of the 
+Linux Perf tool, native to all linux kernels, making it an excellent choice for a portable detection algorithm for various Linux based environements~\cite{arm_pmu}. 
+\subsection{OpenShift}
+While Red Hat OpenShift enforces strict logical isolation between tenants using Linux namespaces, cgroups, and SELinux, it relies on a shared infrastructure model to maximize resource utilization. 
+Under the hood, OpenShift utilizes the CRI-O container runtime running on Red Hat Enterprise Linux CoreOS (RHCOS). 
+Because containers are executed as standard processes on a shared host kernel, they are subject to microarchitectural leakage. 
+In multi-tenant environments, this architecture allows for the following attack scenarios:
+\begin{itemize}
+    \item Cross Service Attack: {Occurs from within the cluster when a maliscious container is injected into the openshift cluster running on the same node and resources allowing for straightforward access to the LLC and even L1 and L2}
+    \item Hyper Threading Vulnerability: {The cluster may have reserved a full logical core, but it is not physical, hyperthreadign allows for a single physical core to be split meaning that a logically seperated core does not have an isolated cache, leading to an opportunity for an attack to exploit if ran on the sibling core.}
+\end{itemize}
+
 
 \section{Methodology}
+\subsection{Existing Solutions Methods and Differentiation}
+\subsubsection{SCADET}
+SCADET approaches the task of detecting by making use of dynamic binary analysis and instrumentation (via intel PIN) rather than reading hardware metrics. When binaries 
+are intialised it performs an isolated pre-run check which logs every touched memory address during a test run to determine if there is an ``invariant pattern'' 
+(prime+probe memory access signature) \cite{scadet}.
+
+The issue when attempting to apply it to a RHOCP cluster is that the cluster running on the cloud infrastructure has no way of tracing 
+binaries running on logically seperated tenant spaces. So, in the case of the cluster it would be blind to external container runtimes. 
+The only way it would be able to, is if the cloud providers themselves implemented a master SCADET detector which analysed all binaries across tenant spaces, rather than making the user run one within their own space. 
+It is aligned better for container injection attack detection but does not cover the case where a maliscious co-tenant, on a different logical space, is 
+performing an attack, making it unsuitable for the proposed problem of detecting maliscious co-tenant activities.
+
+\subsubsection{CloudRadar}
+CloudRadar serves a similar purpose to my proposed solution however, it focuses on full IaaS (Infrastructre as a Service) virtualised environments (i.e., VMs).
+This means it monitors microarchitectural anomalies, using PMU metrics, on a system-wide level within the infrastructure \cite{cloudradar}. While, my solution performs application-specific hardware profiling 
+by monitoring hardware metrics and performance counters for individual application workloads. 
+CloudRadar performs real-time detection (unlike SCADET) by calssifying anomalies with various static and dynamic threshold checks based on metrics from the PMU, a similar technique which I also use.
+
+While effective for traditional cloud infrastructure, this approach is architecturally incompatible with modern containerized SaaS (Software as a Service) platforms (containerised, client-serving applications) running on RHOCP clusters. 
+In a containerized SaaS environment, application pods share a single host OS kernel rather than running independent, heavy guest operating systems on top of a hypervisor, like a VM would. 
+Attempting to deploy hypervisor-level detection methods within a lightweight container runtime would violate the portability and resource efficiency of RHOCP. 
+
+\subsubsection{SPY-PMU}
+Out of all mentioned methodologies and approaches SPY-PMU is the closest to my solution, however, with one critical distinction, it outlines an attack leveraging PMU metrics rather than defending. It uses PMU metrics to build "classifiers using logistic regression, decision tree, k-nearest neighbors, and random forest ML models"~\cite{spypmu}.
+
+While SPY-PMU highlights the severe privacy risks of exposed hardware counters in multi-tenant environments, it validates the premise of my 
+project. Which is that microarchitectural PMU hardware metrics contain usable and valuable behavioral data, and, rather than exploiting these metrics to leak secrets, my proposed solution 
+uses a similar implementation for classifying anomalies but from a defensive standpoint.
+
+\subsubsection{Existing Solutions Evaluation}
+\begin{table}[!htbp]
+\centering
+\label{tab:existing_solutions}
+\resizebox{\textwidth}{!}{% % <-- Shrinks table to fit text width
+\begin{tabular}{|l|l|l|l|l|}
+\hline
+\textbf{Solution} & \textbf{Layer} & \textbf{Telemetry} & \textbf{Timing} & \textbf{Cloud Use-Case} \\ \hline
+SCADET & Software & Memory Addresses & Offline & Pre-deployment Binary Scanning \\ \hline
+CloudRadar & IaaS/Hypervisor & Aggregate PMU & Real-Time & Virtual Machine Security \\ \hline
+SPY-PMU & Hardware/OS & Native PMU & Real-Time & Offensive Profiling / Spying \\ \hline
+\emph{Proposed} & \emph{PaaS/SaaS/Pod} & \emph{App-Specific PMU} & \emph{Real-Time} & \emph{Multi-Tenant, RHOCP Defense} \\ \hline
+\end{tabular}%
+}
+\caption{Comparison of existing cache side channel detection solutions and scope}
+\end{table}
+
 \subsection{Attack Framework}
 \subsection{Detection Logic and Threshold Analysis}
 
@@ -137,6 +195,9 @@ in noisier multi-tenant cloud systems noise will be introduced by a third party,
 \subsubsection{L1 Targeting}
 \subsubsection{Last Level Cache Targeting}
 
+
+\section{Results}
+\subsection{System performance}
 
 \begin{thebibliography}{9}
 
@@ -175,6 +236,28 @@ K.~Wang, F.~Yuan, L.~Zhao, and D.~Meng,
 ``Secure hybrid replacement policy: Mitigating conflict-based cache side channel attacks,'' 
 \textit{ResearchGate [Scientific Figure]}, Jan. 2022. 
 Available: \url{https://www.researchgate.net/figure/Prime-Probe-cache-attacks-The-timing-difference-cache-hits-or-cache-misses-discloses_fig1_357728625} [Accessed 22-Mar-2026].
+
+\bibitem{arm_pmu}
+Arm Limited, 
+``What is the difference between AMU and PMU?,'' 
+[Online]. Available: \url{https://developer.arm.com/documentation/ka004659/latest/}
+
+\bibitem{scadet}
+M.~Sabbagh, T.~Wahl, and S.~Reda, 
+``SCADET: A Side-Channel Attack Detection Tool for Tracking Prime+Probe,'' 
+in \emph{2018 IEEE Conference on Dependable and Secure Computing (DSC)}, 
+2018. [Online]. Available: \url{https://www.ccs.neu.edu/home/wahl/Publications/sfwd18.pdf} 
+
+\bibitem{cloudradar}
+T.~Zhang, Y.~Zhang, and R.~B.~Lee 
+``CloudRadar: A Real-Time Side-Channel Attack Detection System in Clouds,'' 
+2016. [Online]. Available: \url{https://yinqian.org/papers/raid16.pdf}
+
+\bibitem{spypmu}
+A.~Nanos, M.~Oikonomakos, and K.~Nikolopoulos, 
+``SPY-PMU: Side-Channel Profiling of Your Performance Monitoring Unit to Leak Remote User Activity,'' 
+\emph{Cryptology ePrint Archive}, Paper 2024/1832, 2024. [Online]. Available: \url{https://eprint.iacr.org/2025/014.pdf}
+
 
 \end{thebibliography}
 

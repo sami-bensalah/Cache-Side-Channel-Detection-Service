@@ -26,26 +26,43 @@
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {2.3.1}Flush+Reload}{3}{subsubsection.2.3.1}\protected@file@percent }
 \citation{prime_probe_img}
 \citation{prime_probe_img}
-\bibcite{kernel_spectre}{1}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.3.2}Prime+Probe on L1 and Last Level Cache LLC}{4}{subsubsection.2.3.2}\protected@file@percent }
+\citation{arm_pmu}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.3.2}Prime+Probe}{4}{subsubsection.2.3.2}\protected@file@percent }
 \@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Prime + Probe cache attacks. The timing difference (cache hits or cache misses) discloses the victim's access pattern. \cite  {prime_probe_img}}}{4}{figure.2}\protected@file@percent }
 \newlabel{fig:prime_probe}{{2}{4}{Prime + Probe cache attacks. The timing difference (cache hits or cache misses) discloses the victim's access pattern. \cite {prime_probe_img}}{figure.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}PMU and Hardware Counters}{4}{subsection.2.4}\protected@file@percent }
+\citation{scadet}
+\citation{cloudradar}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5}OpenShift}{5}{subsection.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Methodology}{5}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Existing Solutions Methods and Differentiation}{5}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.1}SCADET}{5}{subsubsection.3.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.2}CloudRadar}{5}{subsubsection.3.1.2}\protected@file@percent }
+\citation{spypmu}
+\bibcite{kernel_spectre}{1}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.3}SPY-PMU}{6}{subsubsection.3.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.4}Existing Solutions Evaluation}{6}{subsubsection.3.1.4}\protected@file@percent }
+\newlabel{tab:existing_solutions}{{3.1.4}{6}{Existing Solutions Evaluation}{subsubsection.3.1.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Comparison of existing cache side channel detection solutions and scope}}{6}{table.2}\protected@file@percent }
 \bibcite{redhat2019}{2}
 \bibcite{openshift_usage}{3}
 \bibcite{arm_architecture}{4}
 \bibcite{spectre_og}{5}
 \bibcite{primeprobe}{6}
 \bibcite{prime_probe_img}{7}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}OpenShift}{5}{subsection.2.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.5}PMU and Hardware Counters}{5}{subsection.2.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3}Methodology}{5}{section.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Attack Framework}{5}{subsection.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Detection Logic and Threshold Analysis}{5}{subsection.3.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4}Implementation}{5}{section.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Detection Service}{5}{subsection.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Spectre Gadget}{5}{subsection.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.1}Flush+Reload Validation}{5}{subsubsection.4.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Prime+Probe Implementation}{5}{subsection.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.1}L1 Targeting}{5}{subsubsection.4.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.2}Last Level Cache Targeting}{5}{subsubsection.4.3.2}\protected@file@percent }
-\gdef \@abspage@last{5}
+\bibcite{arm_pmu}{8}
+\bibcite{scadet}{9}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Attack Framework}{7}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Detection Logic and Threshold Analysis}{7}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Implementation}{7}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Detection Service}{7}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Spectre Gadget}{7}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.1}Flush+Reload Validation}{7}{subsubsection.4.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Prime+Probe Implementation}{7}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.1}L1 Targeting}{7}{subsubsection.4.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.2}Last Level Cache Targeting}{7}{subsubsection.4.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Results}{7}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}System performance}{7}{subsection.5.1}\protected@file@percent }
+\bibcite{cloudradar}{10}
+\bibcite{spypmu}{11}
+\gdef \@abspage@last{8}
