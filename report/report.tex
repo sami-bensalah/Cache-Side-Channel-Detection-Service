@@ -10,6 +10,8 @@
 \usepackage{xurl}
 \usepackage[hidelinks]{hyperref}
 \usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{multicol}
 \usepackage{titling}
 \usepackage{float}
 \setlength{\droptitle}{-2cm}
@@ -132,14 +134,14 @@ Under the hood, OpenShift utilizes the CRI-O container runtime running on Red Ha
 Because containers are executed as standard processes on a shared host kernel, they are subject to microarchitectural leakage. 
 In multi-tenant environments, this architecture allows for the following attack scenarios:
 \begin{itemize}
-    \item Cross Service Attack: {Occurs from within the cluster when a maliscious container is injected into the openshift cluster running on the same node and resources allowing for straightforward access to the LLC and even L1 and L2}
+    \item Cross Service Attack: {Occurs from within the cluster when a malicious container is injected into the openshift cluster running on the same node and resources allowing for straightforward access to the LLC and even L1 and L2}
     \item Hyper Threading Vulnerability: {The cluster may have reserved a full logical core, but it is not physical, hyperthreadign allows for a single physical core to be split meaning that a logically seperated core does not have an isolated cache, leading to an opportunity for an attack to exploit if ran on the sibling core.}
 \end{itemize}
 
 
 \section{Methodology}
-\subsection{Existing Solutions Methods and Differentiation}
-\subsubsection{SCADET}
+\subsection{Reviewing of Existing Solutions Methods}
+\subsubsection{SCADET - Pre-deployment Static Binary Scanning}
 SCADET approaches the task of detecting by making use of dynamic binary analysis and instrumentation (via intel PIN) rather than reading hardware metrics. When binaries 
 are intialised it performs an isolated pre-run check which logs every touched memory address during a test run to determine if there is an ``invariant pattern'' 
 (prime+probe memory access signature) \cite{scadet}.
@@ -147,21 +149,21 @@ are intialised it performs an isolated pre-run check which logs every touched me
 The issue when attempting to apply it to a RHOCP cluster is that the cluster running on the cloud infrastructure has no way of tracing 
 binaries running on logically seperated tenant spaces. So, in the case of the cluster it would be blind to external container runtimes. 
 The only way it would be able to, is if the cloud providers themselves implemented a master SCADET detector which analysed all binaries across tenant spaces, rather than making the user run one within their own space. 
-It is aligned better for container injection attack detection but does not cover the case where a maliscious co-tenant, on a different logical space, is 
-performing an attack, making it unsuitable for the proposed problem of detecting maliscious co-tenant activities.
+It is aligned better for container injection attack detection but does not cover the case where a malicious co-tenant, on a different logical space, is 
+performing an attack, making it unsuitable for the proposed problem of detecting malicious co-tenant activities.
 
-\subsubsection{CloudRadar}
+\subsubsection{CloudRadar - Hypervisor-Level System Profiling}
 CloudRadar serves a similar purpose to my proposed solution however, it focuses on full IaaS (Infrastructre as a Service) virtualised environments (i.e., VMs).
 This means it monitors microarchitectural anomalies, using PMU metrics, on a system-wide level within the infrastructure \cite{cloudradar}. While, my solution performs application-specific hardware profiling 
 by monitoring hardware metrics and performance counters for individual application workloads. 
 CloudRadar performs real-time detection (unlike SCADET) by calssifying anomalies with various static and dynamic threshold checks based on metrics from the PMU, a similar technique which I also use.
 
-While effective for traditional cloud infrastructure, this approach is architecturally incompatible with modern containerized SaaS (Software as a Service) platforms (containerised, client-serving applications) running on RHOCP clusters. 
+While effective for traditional cloud infrastructure, I found that this approach is architecturally incompatible with modern containerized SaaS (Software as a Service) platforms (containerised, client-serving applications) running on RHOCP clusters. 
 In a containerized SaaS environment, application pods share a single host OS kernel rather than running independent, heavy guest operating systems on top of a hypervisor, like a VM would. 
 Attempting to deploy hypervisor-level detection methods within a lightweight container runtime would violate the portability and resource efficiency of RHOCP. 
 
-\subsubsection{SPY-PMU}
-Out of all mentioned methodologies and approaches SPY-PMU is the closest to my solution, however, with one critical distinction, it outlines an attack leveraging PMU metrics rather than defending. It uses PMU metrics to build "classifiers using logistic regression, decision tree, k-nearest neighbors, and random forest ML models"~\cite{spypmu}.
+\subsubsection{SPY-PMU - Weaponization of Hardware Telemetry}
+Out of all mentioned methodologies and approaches SPY-PMU is the closest to my solution, however, with one critical distinction, it outlines an attack leveraging PMU metrics rather than defending. It uses PMU metrics to build ``classifiers using logistic regression, decision tree, k-nearest neighbors, and random forest ML models"~\cite{spypmu}.
 
 While SPY-PMU highlights the severe privacy risks of exposed hardware counters in multi-tenant environments, it validates the premise of my 
 project. Which is that microarchitectural PMU hardware metrics contain usable and valuable behavioral data, and, rather than exploiting these metrics to leak secrets, my proposed solution 
@@ -171,7 +173,7 @@ uses a similar implementation for classifying anomalies but from a defensive sta
 \begin{table}[!htbp]
 \centering
 \label{tab:existing_solutions}
-\resizebox{\textwidth}{!}{% % <-- Shrinks table to fit text width
+\resizebox{\textwidth}{!}{
 \begin{tabular}{|l|l|l|l|l|}
 \hline
 \textbf{Solution} & \textbf{Layer} & \textbf{Telemetry} & \textbf{Timing} & \textbf{Cloud Use-Case} \\ \hline
@@ -184,14 +186,135 @@ SPY-PMU & Hardware/OS & Native PMU & Real-Time & Offensive Profiling / Spying \\
 \caption{Comparison of existing cache side channel detection solutions and scope}
 \end{table}
 
-\subsection{Attack Framework}
+\subsection{Attack Decisions}
+\subsubsection{Victim Purpose and Vulnerability Mechanism}
+For my victim I wanted to make it represent a common workload running on cluster environments. The majority of client-serving systems provide a method for session 
+establishment, often through serving web tokens desgined to represent a user's idenity for a set period of time. This also makes it a target of interest
+for cloud service attackers who are interested in gaining access to and stealing secrets, so they can forge their own identities. Stolen and forged 
+authentication tokens are now involved in up to 31\% of all cloud data breach incidents~\cite{verizon}. This led to me making the decision of developing
+a victim service for session token generation due to its increased likelihood of coming under attack in a real environment.
+
+For the vulnerability mechanism needed within my server I researched two main options Meltdown and Spectre. Both provided excellent gadgets 
+for my future side-channel attack method, however, they also needed to be realistic within my modeled cloud environment. I determined that this made Meltdown an unlikely
+candidate for my side-channel, as out of the two options, meltdown experienced very effective and neutralisng mitigations compared to spectre. KPTI (Kernel Page Table Isolation)
+completely neutralises it by forcing the OS to maintain two distinct page tables for every user process, no more unified table architecture (kernel and user tables loaded into the same space).
+A further issue with this mitigation is that it is widely applied by default in all major cloud providors and platforms (AWS, Azure, Google Cloud, RHOCP).
+
+However, I found that spectre, particularly spectre v1 still posed a serious concern on the majority of cloud systems. Which, as I mentioned in Section 1.1.2 is an 
+incredibly difficult attack to fully mitigate effectively due to the need for speculative execution capabilities within modern systems.
+\subsubsection{Side Channel}
+As discussed previously, the side channel attack has to be capable of exploiting the main vulnerability of public cloud environments, the shared
+microarchitectural resources. Within multi-tenant environments, it is possible to be assigned a portion of the same core as a neighbour. Though 
+a core may be logically seperated, it means in the best case a malicious neighbour has access to just the LLC (if assigned a completely different physical core) and in the worst case
+can access all levels of cache used by the victim(if assigned a hyperthreaded core).
+\\ \\
+So, the side-channel attack method chosen needed to be able to satsify the following:
+\begin{itemize}[nosep]
+    \item Bypass logical isolation / virtualization
+    \item Exploit shared microarchitectural resources (i.e., L1, L2, LLC)
+    \item Be resilient to managed environment constraints -- require minimal privileges
+\end{itemize}
+
+\begin{table}[!htbp]
+\centering
+\label{tab:cache_attacks}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{|l|l|l|l|l|}
+\hline
+\textbf{Attack} & \textbf{Bypasses Isolation} & \textbf{Shared Memory Needed?} & \textbf{Privilege Needed?} & \textbf{Target} \\ \hline
+Flush + Flush   & No                          & Yes                            & No                         & LLC\\ \hline
+Flush + Reload  & No                          & Yes                            & No                         & LLC\\ \hline
+Prime + Probe   & Yes                         & No                             & No                         & All Levels\\ \hline
+Prime + Scope   & Yes                         & No                             & No                         & L1, LLC\\ \hline
+\end{tabular}%
+}
+\caption{Evaluation of Cache Side-Channel Attacks on Public Cloud Environments}
+\end{table}
+
+After evaluating the four attacks listed in Table \ref{tab:cache_attacks} I found that the most suitable would be Prime+Probe. Any flush based
+method was unsuitable for the cross tenant attack due to the requirement for shared memory between attacker and victim processes. This left 
+Prime+Probe and Prime+Scope (a more modern alternative to probe). However, Prime+Probe is a significantly more robust attack when applied to 
+various versions of similar underlying hardware environments making it the ideal choice for my cache side-channel attack.
+
 \subsection{Detection Logic and Threshold Analysis}
+I first started by investigating the exact hardware counters perf exposes, and analysed their usability for my detection algorithm. 
+From this I identified the following hardware event counters:
+\begin{multicols}{3}
+\begin{itemize}[nosep]
+    \item branch-references
+    \item branch-misses
+    \item LLC-misses
+    \item LLC-loads
+    \item instructions
+    \item cycles
+\end{itemize}
+\end{multicols}
+Perf also contains the functionality to target specific PIDs (process ids) to fetch metrics associated with a running process or, in the case of my 
+cluster environment, a running container. I then designed the system to collect these metrics regularly on a per container PID basis and have them stored in a 
+time series database. 
+
+In addition, from the event counters collected (listed above) I calculated new fields to give better insights into cache behaviour:
+\begin{itemize}
+    \item $\text{Branch Miss Ratio} = \frac{\text{Branch Misses}}{\text{Branch References}}$
+    \item $\text{LLC Miss Ratio} = \frac{\text{LLC Misses}}{\text{LLC Loads}}$
+    \item $\text{Instructions Per Cycle (IPC)} = \frac{\text{Instructions}}{\text{Cycles}}$
+\end{itemize}
+
+\subsubsection{Initial Detection Method}
+The initial simple detection method I developed involved determining a LLC miss baseline per PID based on the last 10 minutes worth of metrics collected $M$ and the standard deviation $\sigma_M$. 
+After which for each newly collected LLC miss reading $m$, we resolve $m > 3\sigma_M$ and if true, then we return that it was an anomaly and an attack is occurring.
+This approach had various issues, though it managed to successfully identify an attack. However, its one dimensional approach to the problem assumed that any slight 
+increases in cache miss activity was due to an attack and, therefore, could not differentiate between system noise level changes and malicious activity. 
+This was also in part because of its inability to effectively adapt to increased non-attack noise by effectively calculating a new baseline. Making it practically
+useless in real cluster environments.
+
+\subsubsection{Final Revised Detction Method}
+To solve this issue I collected more hardware event metrics, moving away from simply using LLC misses as an indicator for an attack. I 
+used the last minute of recorded metrics to train a multivariate linear regression model for predicting LLC misses for each container PID $p$, as seen in Equation \ref{eq:model}.
+\begin{equation}
+    \label{eq:model}
+    \emph{Predicted Misses}_{p} = \beta_0 + \beta_1(\text{LLC Loads}_{p}) + \beta_2(\text{Branch Miss Ratio}_{p}) + \beta_3(\text{IPC}_{p})
+\end{equation}
+This allowed the detector to determine whether a capture of cache activity was truly anomalous by checking whether the difference $d > 3\sigma$, 
+where $d = |\emph{Actual Misses} - \emph{Predicted Misses}|$ and $\sigma$ is the standard deviation of the training set for the current model. 
+
+This resulted in a steep decline in the number of false positives between various levels of system noise and attacks were still being successfully detected 100\% of the time.
+The issue, however, was that false positives were still appearing, particularly when extreme changes in noise occurred (i.e., low to high server load).
+
+To solve this I introduced a secondary threshold after detection. This implementation came 
+after I consistently observed minimal variation in collected anomalous LLC Miss Ratios when an attack was occurring, as seen in Figure \ref{fig:llc_ratio}.
+
+\begin{figure}[H] 
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/llc_ratio.png}
+    \caption{Capture of LLC Miss Ratio Metrics From Time Series Database}
+    \label{fig:llc_ratio}
+\end{figure}
+
+In addition, I noted that though it seemed during the attack the dead giveaway is a sudden drop in LLC Miss Ratio values (see Figure \ref{fig:llc_ratio}), this was not unique to just the attack but 
+would also occur when there was a decrease in container workload activity. So, the only unique trait of the attack's cache footprint was the
+lack of variation in recorded LLC Miss Ratios.
+
+To exploit this footprint I would collect the last 20 recorded anomalies that occurred, the standard deviation $\sigma_a$ of these 20 anomalies would then be calculated 
+and if $\sigma_a < 0.01$ then I would classify the current behaviour as an attack and return a detection.
+
+If it was not classified as an attack at this point then it signals that there has been a significant shift in the container's activity and a new model
+is calculated to prevent false anomalies from appearing any longer. If there are no such significant anomalies recorded the model is still refreshed every
+minute, allowing it to adapt to slow changing, consistent container workloads. When an anomaly is first noted the model refresh is paused until it can be
+resolved, if only one anomaly pops up and 10 sequential non-anomalous readings are recorded then the detector assumes it was just a sudden spike due to background noise
+and clears it to continue refreshing the model. 
 
 \section{Implementation}
 \subsection{Detection Service}
-\subsection{Spectre Gadget}
+\subsection{Victim and Spectre Gadget}
+The victim was initially designed to create new tcp socket connections for each request. I had to revise this during the development of the L1 Prime+Probe attack
+due to issues with L1 thrashing due to high network activty when managing new and existing client connections. This resulted in the TCP connection type
+changing to a persistent socket connection, reducing the number of soket connections needed during an attack from thousands (one per request) to a single
+established TCP socket.
 \subsubsection{Flush+Reload Validation}
-\subsection{Prime+Probe Implementation}
+To validate the existence of the spectre v1 vulnerability within my server I designed a Flush+Reload attack ran from within the server's code to 
+test whether the transient execution of my spectre gadget was being triggered.
+\subsection{Prime+Probe over HTTP Implementation}
 \subsubsection{L1 Targeting}
 \subsubsection{Last Level Cache Targeting}
 
@@ -199,6 +322,8 @@ SPY-PMU & Hardware/OS & Native PMU & Real-Time & Offensive Profiling / Spying \\
 \section{Results}
 \subsection{System performance}
 
+
+\newpage
 \begin{thebibliography}{9}
 
 \bibitem{kernel_spectre}
@@ -257,6 +382,11 @@ T.~Zhang, Y.~Zhang, and R.~B.~Lee
 A.~Nanos, M.~Oikonomakos, and K.~Nikolopoulos, 
 ``SPY-PMU: Side-Channel Profiling of Your Performance Monitoring Unit to Leak Remote User Activity,'' 
 \emph{Cryptology ePrint Archive}, Paper 2024/1832, 2024. [Online]. Available: \url{https://eprint.iacr.org/2025/014.pdf}
+
+\bibitem{verizon}
+Verizon, 
+``,'' 
+2016. [Online]. Available: \url{https://yinqian.org/papers/raid16.pdf}
 
 
 \end{thebibliography}

@@ -35,15 +35,36 @@
 \citation{cloudradar}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.5}OpenShift}{5}{subsection.2.5}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {3}Methodology}{5}{section.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Existing Solutions Methods and Differentiation}{5}{subsection.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.1}SCADET}{5}{subsubsection.3.1.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.2}CloudRadar}{5}{subsubsection.3.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Reviewing of Existing Solutions Methods}{5}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.1}SCADET - Pre-deployment Static Binary Scanning}{5}{subsubsection.3.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.2}CloudRadar - Hypervisor-Level System Profiling}{5}{subsubsection.3.1.2}\protected@file@percent }
 \citation{spypmu}
-\bibcite{kernel_spectre}{1}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.3}SPY-PMU}{6}{subsubsection.3.1.3}\protected@file@percent }
+\citation{verizon}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.3}SPY-PMU - Weaponization of Hardware Telemetry}{6}{subsubsection.3.1.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.4}Existing Solutions Evaluation}{6}{subsubsection.3.1.4}\protected@file@percent }
 \newlabel{tab:existing_solutions}{{3.1.4}{6}{Existing Solutions Evaluation}{subsubsection.3.1.4}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Comparison of existing cache side channel detection solutions and scope}}{6}{table.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Attack Decisions}{6}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.1}Victim Purpose and Vulnerability Mechanism}{6}{subsubsection.3.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.2}Side Channel}{7}{subsubsection.3.2.2}\protected@file@percent }
+\newlabel{tab:cache_attacks}{{3.2.2}{7}{Side Channel}{subsubsection.3.2.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Evaluation of Cache Side-Channel Attacks on Public Cloud Environments}}{7}{table.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Detection Logic and Threshold Analysis}{7}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.3.1}Initial Detection Method}{8}{subsubsection.3.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.3.2}Final Revised Detction Method}{8}{subsubsection.3.3.2}\protected@file@percent }
+\newlabel{eq:model}{{1}{8}{Final Revised Detction Method}{equation.3.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Capture of LLC Miss Ratio Metrics From Time Series Database}}{8}{figure.3}\protected@file@percent }
+\newlabel{fig:llc_ratio}{{3}{8}{Capture of LLC Miss Ratio Metrics From Time Series Database}{figure.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Implementation}{9}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Detection Service}{9}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Victim and Spectre Gadget}{9}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.1}Flush+Reload Validation}{9}{subsubsection.4.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Prime+Probe over HTTP Implementation}{9}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.1}L1 Targeting}{9}{subsubsection.4.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.2}Last Level Cache Targeting}{9}{subsubsection.4.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Results}{9}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}System performance}{9}{subsection.5.1}\protected@file@percent }
+\bibcite{kernel_spectre}{1}
 \bibcite{redhat2019}{2}
 \bibcite{openshift_usage}{3}
 \bibcite{arm_architecture}{4}
@@ -52,17 +73,7 @@
 \bibcite{prime_probe_img}{7}
 \bibcite{arm_pmu}{8}
 \bibcite{scadet}{9}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Attack Framework}{7}{subsection.3.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Detection Logic and Threshold Analysis}{7}{subsection.3.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4}Implementation}{7}{section.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Detection Service}{7}{subsection.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Spectre Gadget}{7}{subsection.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.1}Flush+Reload Validation}{7}{subsubsection.4.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Prime+Probe Implementation}{7}{subsection.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.1}L1 Targeting}{7}{subsubsection.4.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.2}Last Level Cache Targeting}{7}{subsubsection.4.3.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5}Results}{7}{section.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}System performance}{7}{subsection.5.1}\protected@file@percent }
 \bibcite{cloudradar}{10}
 \bibcite{spypmu}{11}
-\gdef \@abspage@last{8}
+\bibcite{verizon}{12}
+\gdef \@abspage@last{10}
