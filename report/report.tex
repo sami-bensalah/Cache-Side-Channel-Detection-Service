@@ -17,6 +17,41 @@
 \setlength{\droptitle}{-2cm}
 \hypersetup{breaklinks=true}
 
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{darkblue}{rgb}{0,0,.75}
+\definecolor{mygray}{rgb}{0.7,0.7,.7}
+\definecolor{mymauve}{rgb}{0.58,0,.82}
+\definecolor{mygreen}{rgb}{0,0.6,0}
+
+\lstdefinestyle{customc}{ %
+  backgroundcolor=\color{white},
+  basicstyle=\footnotesize\ttfamily,
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  commentstyle=\color{mygreen},
+  escapeinside={\%*}{*)},
+  extendedchars=true,
+  frame=single,
+  keywordstyle=\color{blue},
+  language=C,
+  numbers=left,
+  numbersep=5pt,
+  numberstyle=\tiny\color{mygray},
+  rulecolor=\color{black},
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  stepnumber=1,
+  stringstyle=\color{mymauve},
+  tabsize=2,
+  title=\lstname,
+  morekeywords={not,\},\{,preconditions,effects,secret},
+  deletekeywords={time}
+}
+
 % --- Document Info ---
 \title{Detecting Cache Side-Channel Attacks in Multi-tenant OpenShift Environments}
 \author{Sami Bensalah}
@@ -98,7 +133,7 @@ So, although the architectural state is rolled back when the CPU realises its mi
 \subsection{Cache Timing Side-Channels}
 A side channel attack is any unintended side effect which can be measured to infer information during a program's execution. In this report I will be discussing side-channel timing attacks specifically which are enabled by the spectre v1 gadget.
 \subsubsection{Flush+Reload}
-Flush+Reload is a widely used attack with the majority of research papers on spectre employ Flush+Reload as a mechanism to read the cache residue caused by the transient execution. This is due to its .
+Flush+Reload is a widely used attack with the majority of research papers on spectre employing it as a mechanism to read the cache residue caused by the transient execution. This is due to its .
 It involves flushing a target address' data from memory, spectre v1 is then triggered and if the spectre gadget maps to that flushed address it speculatively accesses it. We then perform the reload which is where we measure our timing side-channel, 
 this involves measuring the fetch time using hardware level timers. If the fetch time is under a certain cycle threshold then we can infer that the address, though it was previously flushed, is now in cache, meaning that it was used speculatively, allowing us to steal secret information.
 
@@ -139,9 +174,10 @@ In multi-tenant environments, this architecture allows for the following attack 
 \end{itemize}
 
 
-\section{Methodology}
-\subsection{Reviewing of Existing Solutions Methods}
-\subsubsection{SCADET - Pre-deployment Static Binary Scanning}
+
+
+\section{Reviewing of Existing Solutions Methods}
+\subsection{SCADET - Pre-deployment Static Binary Scanning}
 SCADET approaches the task of detecting by making use of dynamic binary analysis and instrumentation (via intel PIN) rather than reading hardware metrics. When binaries 
 are intialised it performs an isolated pre-run check which logs every touched memory address during a test run to determine if there is an ``invariant pattern'' 
 (prime+probe memory access signature) \cite{scadet}.
@@ -152,7 +188,7 @@ The only way it would be able to, is if the cloud providers themselves implement
 It is aligned better for container injection attack detection but does not cover the case where a malicious co-tenant, on a different logical space, is 
 performing an attack, making it unsuitable for the proposed problem of detecting malicious co-tenant activities.
 
-\subsubsection{CloudRadar - Hypervisor-Level System Profiling}
+\subsection{CloudRadar - Hypervisor-Level System Profiling}
 CloudRadar serves a similar purpose to my proposed solution however, it focuses on full IaaS (Infrastructre as a Service) virtualised environments (i.e., VMs).
 This means it monitors microarchitectural anomalies, using PMU metrics, on a system-wide level within the infrastructure \cite{cloudradar}. While, my solution performs application-specific hardware profiling 
 by monitoring hardware metrics and performance counters for individual application workloads. 
@@ -162,14 +198,14 @@ While effective for traditional cloud infrastructure, I found that this approach
 In a containerized SaaS environment, application pods share a single host OS kernel rather than running independent, heavy guest operating systems on top of a hypervisor, like a VM would. 
 Attempting to deploy hypervisor-level detection methods within a lightweight container runtime would violate the portability and resource efficiency of RHOCP. 
 
-\subsubsection{SPY-PMU - Weaponization of Hardware Telemetry}
+\subsection{SPY-PMU - Weaponization of Hardware Telemetry}
 Out of all mentioned methodologies and approaches SPY-PMU is the closest to my solution, however, with one critical distinction, it outlines an attack leveraging PMU metrics rather than defending. It uses PMU metrics to build ``classifiers using logistic regression, decision tree, k-nearest neighbors, and random forest ML models"~\cite{spypmu}.
 
 While SPY-PMU highlights the severe privacy risks of exposed hardware counters in multi-tenant environments, it validates the premise of my 
 project. Which is that microarchitectural PMU hardware metrics contain usable and valuable behavioral data, and, rather than exploiting these metrics to leak secrets, my proposed solution 
 uses a similar implementation for classifying anomalies but from a defensive standpoint.
 
-\subsubsection{Existing Solutions Evaluation}
+\subsection{Existing Solutions Evaluation}
 \begin{table}[!htbp]
 \centering
 \label{tab:existing_solutions}
@@ -186,6 +222,31 @@ SPY-PMU & Hardware/OS & Native PMU & Real-Time & Offensive Profiling / Spying \\
 \caption{Comparison of existing cache side channel detection solutions and scope}
 \end{table}
 
+
+\section{Methodology}
+\subsection{Experimental Setup}
+\subsection{Hardware and System Specifications}
+The experiments were conducted on a bare-metal x86 system running Ubuntu 22.04 LTS. The hardware profile and architectural specifications of the host machine are detailed in Table \ref{tab:hardware_specs}.
+
+
+\begin{table}[!htbp]
+\centering
+
+\label{tab:hardware_specs}
+\begin{tabular}{l|l}
+\textbf{Component} & \textbf{Specification} \\ 
+\hline
+CPU & i7-10750H (6 Cores / 12 Threads) \\
+Microarchitecture & x86\_64 \\
+L1 Data Cache & $32\text{ KB}$ per physical core \\
+L2 Cache & $256\text{ KB}$ per physical core \\
+L3 Cache (LLC) & $12\text{ MB}$ Shared Unified \\
+Memory & $24\text{ GB}$ DDR4 \\
+
+\end{tabular}
+\caption{Lab Environment Hardware Specifications}
+\end{table}
+
 \subsection{Attack Decisions}
 \subsubsection{Victim Purpose and Vulnerability Mechanism}
 For my victim I wanted to make it represent a common workload running on cluster environments. The majority of client-serving systems provide a method for session 
@@ -198,7 +259,7 @@ For the vulnerability mechanism needed within my server I researched two main op
 for my future side-channel attack method, however, they also needed to be realistic within my modeled cloud environment. I determined that this made Meltdown an unlikely
 candidate for my side-channel, as out of the two options, meltdown experienced very effective and neutralisng mitigations compared to spectre. KPTI (Kernel Page Table Isolation)
 completely neutralises it by forcing the OS to maintain two distinct page tables for every user process, no more unified table architecture (kernel and user tables loaded into the same space).
-A further issue with this mitigation is that it is widely applied by default in all major cloud providors and platforms (AWS, Azure, Google Cloud, RHOCP).
+A further issue with Meltdown is that this mitigation is widely applied by default in all major cloud providors and platforms (AWS, Azure, Google Cloud, RHOCP).
 
 However, I found that spectre, particularly spectre v1 still posed a serious concern on the majority of cloud systems. Which, as I mentioned in Section 1.1.2 is an 
 incredibly difficult attack to fully mitigate effectively due to the need for speculative execution capabilities within modern systems.
@@ -305,22 +366,161 @@ resolved, if only one anomaly pops up and 10 sequential non-anomalous readings a
 and clears it to continue refreshing the model. 
 
 \section{Implementation}
-\subsection{Detection Service}
+\subsection{Architecture Overview}
+\begin{figure}[H] 
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/defense_architecture.png}
+    \caption{System Architecture Of Proposed Detector Deployment in a Mulit-Tenant Environment}
+    \label{fig:sys_design}
+\end{figure}
+
+
+\subsection{Telemetry and Metric Collection}
+To collect metrics I created a Python script \texttt{collector.py} and ran it in a container called perf-collector with a base image of \texttt{ubuntu:22.04}. The collector loads in the namespaces
+to be monitored from a config file mounted by the user onto the detector deployment as a configmap resource to set up the detection space. 
+
+The collector then begins the scanning of targeted namespaces by using the crictl interface to query running container PIDs. 
+Cache metrics are then collected with \texttt{perf stat -e <event-counter-names> -p <PID>  sleep 1}. Sleep 1, determines the amount 
+of time the metrics are sampled over, which is 1 second. This introduces a rate limit for each PID's metric collection of one sample per second and the cache
+readings across that time are aggregated into a single measurement. To remove this bottlneck when multiple different PIDs are being monitored simultaneously, multithreading
+was implemented so that each PID's metric collection was independent of others. As prior to this there was a delay of $n$ seconds ($n = PID_count$) between
+a specific process' cache measurements.
+
+The deployment was then exposed internally as a service (a route only accessible within the cluster). The collector acted as a prometheus HTTP client, exposing 
+metrics on the \texttt{/metrics} endpoint of its HTTP server. I deployed a prometheus application (time series database, image \texttt{prom/prometheus:v2.45.0}) into my cluster detector namespace alongside my collector container. 
+And configured the prometheus deployment to scrape from my \texttt{/metrics} endpoint every second (matching the rate of collection). 
+
+This resulted in new and established PIDs within monitored cluster namespaces having their telemetry queried and stored successfully.
+
+\subsection{Detection}
+To reduce the overhead of my detection system the \texttt{detection.py} script was integrated into the same container used for \texttt{collector.py}. This also made it
+significantly easier to investigate metrics as they were collected. 
+Once a minute has passed since a PID has been detected and queried, a model is built, this model is then updated on the last minute worth of all metrics queried 
+from the prometheus deployment with PromQL: \texttt{<metric>\{pid=<pid>\}[60s:1s]}. A model fit score and standard deviation for cache misses is then calculated.
+
+If a PID's measurements are classified as anomalous by the detector the LLC miss:ref ratio of the measurement is stored in a PID:<List> dictionary and 
+the methods outlined in Section 3.3.2 are used to classify if the noise variance is an attack or not. The model is then refreshed based on current 
+readings if it is not deemed an attack. The model is also refreshed based on a one minute timer, which is ignored if anomalies are seen until they are
+resolved. 
+
+MAYBE ADD OUTPUT FOR CLARITY
+
 \subsection{Victim and Spectre Gadget}
+The victim was implemented in C. The memory layout is structured in a way to allow for the spectre gadget to be used to access bytes of the secret signing
+key within the server. 
 The victim was initially designed to create new tcp socket connections for each request. I had to revise this during the development of the L1 Prime+Probe attack
 due to issues with L1 thrashing due to high network activty when managing new and existing client connections. This resulted in the TCP connection type
 changing to a persistent socket connection, reducing the number of soket connections needed during an attack from thousands (one per request) to a single
 established TCP socket.
+The server accepts three fields via the client's POST request: Username, Password and ID. These fields are passed through to the \texttt{get token} function  
+which generates a HMAC signed token based on time, username and ID using the signing key. This function contains the spectre gadget, seen in Listing \ref{lst:spectre}.
+
+\begin{figure}[H]
+\begin{lstlisting}[style=customc, caption={Spectre Gadget in Victim.c}, label={lst:spectre}]
+if (user_id < layout.role_binding.role_count) {
+    tmp = layout.role_usage[layout.role_binding.roles[user_id] * CACHE_STRIDE]; 
+}
+\end{lstlisting}
+\end{figure}
+
+The legitimate purpose of this if statement is to perform logging of user roles for statistical purposes. The cache stride (4096) represents the size of a standard page of 
+memory, a common tactic used within servers to prevent memory contention between two different threads accessing an array. However, this also provides a perfect gadget for an 
+attack. The adversary can send an out of bounds ID, and the server speculatively executes \texttt{layout.role\_binding.roles[user\_id]}, maybe accessing a secret key byte, 
+the value of the byte is then multiplied by the cache stride, allowing us to figure out expected address offsets where a certain byte value would touch (offset from the base of \texttt{layout.role\_usage}). 
+
+An issue faced during the development of the victim was the difficulty in consistently firing Spectre V1. This was due to stubborn local branch predictor
+not taking to training done over HTTP requests. So, to guarantee speculative execution, I moved the training into the server itself just before the get\_token() call. 
 \subsubsection{Flush+Reload Validation}
 To validate the existence of the spectre v1 vulnerability within my server I designed a Flush+Reload attack ran from within the server's code to 
-test whether the transient execution of my spectre gadget was being triggered.
+test whether the transient execution of my spectre gadget was being triggered, allowing me to tune my gadget to be as reliable as possible. 
+This was after difficulty determining whether the issue lay in my developed Prime+Probe attacks or the victim.
+
 \subsection{Prime+Probe over HTTP Implementation}
 \subsubsection{L1 Targeting}
+L1 cache was relatively simple to target in comparison to LLC. It involved reserving a 2Mb byte array and building an eviction set of 8 addresses (L1 is 8-way) for all 64 possible L1 sets.
+Each evicition set was shuffled and stored as a linked list, as to avoid the pre-fetcher effecting measured activity. The main prime+probe loop was split into two main stages, 
+baseline and attack measurement. For each stage the attack would prime the entire L1 cache, send a request, wait for response and then probe. The difference in stages being
+the request sent. For the baseline run a valid ID was sent and for the attack run an invalid out of bounds ID was sent (with a value which overflowed onto a secret key byte).
+The difference in noise measured between the baseline and attack for each set after 10000 runs was calculated and the set with the largest difference was returned.
+
+The issue, mentioned in Section 4.4, was L1 thrashing due to high network activity, this made a lot of the returned suspected spectre touched sets incorrect, due to the 
+inconsistency in background system noise. Another issue with this attack was the usability on my modelled multi-tenant environment, to use it I needed to find a way 
+to allocate the cluster a specific sibling core to the attacker's core and assign the victim service to it, which required unecessary and unrealistic environment
+changes.
 \subsubsection{Last Level Cache Targeting}
+LLC Prime+Probe used a similar approach for isolating spectre signal noise through baseline and attack run noise comparison, however, with two major changes.
+The method of building eviction sets and the way of targeting the investigation, as well as dealing with 2x the number of ways (16). Due to LLC slicing, it was impossible to transfer the same implementation used for the
+L1 attack. Instead I provisoned a huge probe array (512MB), using 2MB huge pages (as to reduce the number of TLB lookups). To build the eviction sets I would 
+first receive an input for a byte to investigate and get all addresses from my probe array which the spectre gadget could possibly map to and added them to a pool. 
+I then generated 6 slice sets (6 as I had a 6 core processor) by adding 16 random addresses to a test pool $T$ and slowly growing and testing it against a random address $R$ to see if they evict it,
+if they did then that new address pool $T$ was an eviction set for the slice set where $R$ maps to. I then shrink $T$ to the minimum size required of 16.
+
+For each slice set a baseline vs attack prime+probe is performed 10000 times and the slice with the highest difference is returned. The attacker would then repeat
+the process with varying byte investigations to determine which byte is being touched by spectre. The attack was extremely effective, successfully picking up the
+signal 100\% of the time when investigating the correct byte. 
+
+\section{Results - Solution performance}
+Environement changes: 
+CPU prefetchers
+set CPU mode to performance for consistnet cycles
+disabled kernel watchdog
+spectre v2 mitifations disabled
+\\
+The proposed detection mechanism was evaluated over several testing scenarios to measure its performance, resilience, and limitations under varying 
+architectural conditions. To ensure statistical significance, I simulated each scenario and recorded findings across 30 independent runs within my test
+environment, see Tables in Apendix \ref{appendix:A}. Noise was generated using controlled HTTP requests per second (RPS) profiles: Low (1 RPS), 
+Moderate (30 RPS), and High (80 RPS).
+
+\subsection{Stationary Load Scenarios}
+This section evaluates the detector's efficacy when intercepting a side-channel attack against a fixed-rate arrival window ($1, 30, \text{ and } 80 \text{ RPS}$) but with randomized HTTP request payloads.
+
+\begin{itemize}
+    \item Low-Noise Profile ($1 \text{ RPS}$): $100\%$ Detection Rate ($30/30$ runs) \\
+    The detector performed perfectly when an attack was run against a model trained on low noise, it had no issues identifying anomalies and for all 
+    runs calculated a $\sigma < 0.015$ and correctly identified an attack occurence.
+    
+    \item Moderate-Noise Profile ($30 \text{ RPS}$): $83.3\%$ Detection Rate ($25/30$ runs) \\
+    The detector continued to successfully identify a change in activity and correctly flagged anomalous readings. And while successful detections remained stable, the five failed trials exhibited a $3\times$ spike in variance ($\sigma \approx 0.0210$). 
+    Implying that increased service load introduced minor cache line evictions and, in some cases, resulted in a less predictable and transparent cache environment, leading to more difficulty in differentiating noise from malicious activity.
+    
+    \item High-Noise Profile ($80 \text{ RPS}$): $63.3\%$ Detection Rate ($19/30$ runs) \\
+    At $80 \text{ RPS}$, high container activity heavily thrashed the LLC. While $19$ of the runs were successfully intercepted when variance was kept tight ($\sigma < 0.015$), the remaining $11$ failed trials displayed massive volatility ($\sigma > 0.0500$). This indicates that as the Signal-to-Noise Ratio (SNR) degrades, 
+    the detector struggles to differentiate between legitimate bursts of traffic and a cache side-channel.
+\end{itemize}
+
+So, for all scenarios readings caused by the attack footprint were successfully identified as anomalies 100\% of the time as seen in Tables \ref{tab:cache_attacks_low}, \ref{tab:cache_attacks_mod}, \ref{tab:cache_attacks_high} in Appendix \ref{appendix:A}.
+However, where the detector failed in accuracy was when performing the standard deviation threshold check, particularly in the higher-noise scenarios where LLC thrashing from a surge of requests on the service led to 
+jittery and sporadic cache activity. Resulting in polluted LLC miss:ref ratio readings for the anomalies, inflating the standard deviation and deceiving the detector into
+believing its just noise.
 
 
-\section{Results}
-\subsection{System performance}
+\subsection{Dynamic Environmental Scenarios}
+This section evaluates how the solution responded to sudden shifts in legitimate cluster workload activity and whether an attack was falsely perceived.
+
+\begin{itemize}
+    \item High-to-Low Noise: $100\%$ True Negatives \\
+    As Table \ref{tab:high_to_low} (Appendix \ref{appendix:A}) shows, the detector did not identify the sudden decrease in noise 80 RPM to 1 RPM across all 30 runs 
+    as anomalous and did not even decide to investigate any readings as they conformed to the current regression model in place. Making the correct decision in all
+    recorded trials.
+    \item Low-to-High Noise: $93.3\%$ True Negatives ($28/30$ runs) \\
+    Low to high noise (Table \ref{tab:low_to_high}, Appendix \ref{appendix:A}), resulted in a slight deviation in behaviour in my detector from the noise transition mentioned above.
+    In this case the detector's model identified all new readings caused by the high activity as anomalies and investigated them appropriately. This resulted in the vast 
+    majority being cleared, excluding 2/30 runs which resulted in a false identification.
+\end{itemize}
+
+
+\subsection{Implementation Overhead}
+In limited resource cloud environments its improtant to be able to deploy efficient and low-consumption solutions.
+The overhead introduced by my detection system on the RHOCP cluster (per node) collected from the Linux kernel process
+table indicated the following baseline usage:
+\begin{itemize}
+    \item Prometheus time-series database: CPU Core 1.8\%, Memory $\approx150\text{~MB}$.
+    \item Collector/Detector: CPU Core 0.8\%, Memory $\approx100\text{~MB}$.
+\end{itemize}
+
+
+\section{Conclusion}
+
 
 
 \newpage
@@ -385,10 +585,152 @@ A.~Nanos, M.~Oikonomakos, and K.~Nikolopoulos,
 
 \bibitem{verizon}
 Verizon, 
-``,'' 
-2016. [Online]. Available: \url{https://yinqian.org/papers/raid16.pdf}
-
+``2025 DBIR Report,'' 
+2025. [Online]. Available: \url{https://www.verizon.com/business/resources/reports/2025-dbir-data-breach-investigations-report.pdf}
 
 \end{thebibliography}
+
+
+\newpage
+\appendix
+\section{Performance Evaluatation}
+\label{appendix:A}
+
+\begin{table}[!htbp]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabular}{|l|l|l|l|l|l|l|l|}
+\hline
+\textbf{Run} & \textbf{Investigated?} & \textbf{Outcome} & \textbf{StDev} & \textbf{Run} & \textbf{Investigated?} & \textbf{Outcome} & \textbf{StDev} \\ \hline
+1  & Yes & Detected & 0.00889 & 16 & Yes & Detected & 0.00941 \\
+2  & Yes & Detected & 0.00781 & 17 & Yes & Detected & 0.00411 \\
+3  & Yes & Detected & 0.01166 & 18 & Yes & Detected & 0.00592 \\
+4  & Yes & Detected & 0.00400 & 19 & Yes & Detected & 0.00833 \\
+5  & Yes & Detected & 0.00609 & 20 & Yes & Detected & 0.01015 \\
+6  & Yes & Detected & 0.01382 & 21 & Yes & Detected & 0.00672 \\
+7  & Yes & Detected & 0.00655 & 22 & Yes & Detected & 0.01104 \\
+8  & Yes & Detected & 0.01386 & 23 & Yes & Detected & 0.00488 \\
+9  & Yes & Detected & 0.00578 & 24 & Yes & Detected & 0.00755 \\
+10 & Yes & Detected & 0.00525 & 25 & Yes & Detected & 0.00912 \\
+11 & Yes & Detected & 0.00742 & 26 & Yes & Detected & 0.01245 \\
+12 & Yes & Detected & 0.00811 & 27 & Yes & Detected & 0.00631 \\
+13 & Yes & Detected & 0.00544 & 28 & Yes & Detected & 0.00519 \\
+14 & Yes & Detected & 0.01210 & 29 & Yes & Detected & 0.00882 \\
+15 & Yes & Detected & 0.00698 & 30 & Yes & Detected & 0.00704 \\ \hline
+\end{tabular}%
+}
+\caption{30 runs of Recorded Performance for Low Noise to Attack}
+\label{tab:cache_attacks_low}
+\end{table}
+
+
+\begin{table}[!htbp]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabular}{|l|l|l|l|l|l|l|l|}
+\hline
+\textbf{Run} & \textbf{Investigated?} & \textbf{Outcome} & \textbf{StDev} & \textbf{Run} & \textbf{Investigated?} & \textbf{Outcome} & \textbf{StDev} \\ \hline
+1  & Yes & Detected & 0.00723 & 16 & Yes & Detected & 0.00881 \\
+2  & Yes & Detected & 0.00479 & 17 & Yes & Detected & 0.00512 \\
+3  & Yes & Detected & 0.00412 & 18 & Yes & Cleared  & 0.01955 \\
+4  & Yes & Detected & 0.00747 & 19 & Yes & Detected & 0.00644 \\
+5  & Yes & Cleared  & 0.02401 & 20 & Yes & Detected & 0.00931 \\
+6  & Yes & Detected & 0.00501 & 21 & Yes & Detected & 0.00490 \\
+7  & Yes & Detected & 0.00707 & 22 & Yes & Cleared  & 0.02113 \\
+8  & Yes & Cleared  & 0.01799 & 23 & Yes & Detected & 0.00825 \\
+9  & Yes & Detected & 0.00714 & 24 & Yes & Detected & 0.00719 \\
+10 & Yes & Detected & 0.01012 & 25 & Yes & Detected & 0.00556 \\
+11 & Yes & Detected & 0.00688 & 26 & Yes & Cleared  & 0.02388 \\
+12 & Yes & Detected & 0.00945 & 27 & Yes & Detected & 0.00612 \\
+13 & Yes & Cleared  & 0.01822 & 28 & Yes & Detected & 0.00774 \\
+14 & Yes & Detected & 0.00550 & 29 & Yes & Detected & 0.00802 \\
+15 & Yes & Detected & 0.00713 & 30 & Yes & Detected & 0.00441 \\ \hline
+\end{tabular}%
+}
+\caption{30 runs of Recorded Performance for Moderate Noise to Attack}
+\label{tab:cache_attacks_mod}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabular}{|l|l|l|l|l|l|l|l|}
+\hline
+\textbf{Run} & \textbf{Investigated?} & \textbf{Outcome} & \textbf{StDev} & \textbf{Run} & \textbf{Investigated?} & \textbf{Outcome} & \textbf{StDev} \\ \hline
+1  & Yes & Detected & 0.00634 & 16 & Yes & Detected  & 0.00711 \\
+2  & Yes & Cleared  & 0.05692 & 17 & Yes & Cleared  & 0.05142 \\
+3  & Yes & Detected & 0.00784 & 18 & Yes & Detected & 0.00822 \\
+4  & Yes & Detected & 0.00886 & 19 & Yes & Cleared  & 0.05388 \\
+5  & Yes & Detected & 0.00684 & 20 & Yes & Detected & 0.00711 \\
+6  & Yes & Detected & 0.00645 & 21 & Yes & Cleared  & 0.05590 \\
+7  & Yes & Detected & 0.00562 & 22 & Yes & Detected & 0.00901 \\
+8  & Yes & Cleared  & 0.05634 & 23 & Yes & Cleared  & 0.05923 \\
+9  & Yes & Cleared  & 0.05824 & 24 & Yes & Detected & 0.00504 \\
+10 & Yes & Detected & 0.00825 & 25 & Yes & Detected & 0.00667 \\
+11 & Yes & Cleared  & 0.05411 & 26 & Yes & Cleared  & 0.05778 \\
+12 & Yes & Detected & 0.00892 & 27 & Yes & Detected & 0.00743 \\
+13 & Yes & Cleared  & 0.06120 & 28 & Yes & Cleared  & 0.05219 \\
+14 & Yes & Detected & 0.00755 & 29 & Yes & Detected & 0.00833 \\
+15 & Yes & Detected & 0.00910 & 30 & Yes & Detected & 0.00645 \\ \hline
+\end{tabular}%
+}
+\caption{30 runs of Recorded Performance for High Noise to Attack}
+\label{tab:cache_attacks_high}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabular}{|l|l|l|l|l|l|l|l|}
+\hline
+\textbf{Run} & \textbf{Investigated?} & \textbf{Outcome} & \textbf{StDev} & \textbf{Run} & \textbf{Investigated?} & \textbf{Outcome} & \textbf{StDev} \\ \hline
+1  & No & N/A & N/A & 16 & No & N/A & N/A \\
+2  & No & N/A & N/A & 17 & No & N/A & N/A \\
+3  & No & N/A & N/A & 18 & No & N/A & N/A \\
+4  & No & N/A & N/A & 19 & No & N/A & N/A \\
+5  & No & N/A & N/A & 20 & No & N/A & N/A \\
+6  & No & N/A & N/A & 21 & No & N/A & N/A \\
+7  & No & N/A & N/A & 22 & No & N/A & N/A \\
+8  & No & N/A & N/A & 23 & No & N/A & N/A \\
+9  & No & N/A & N/A & 24 & No & N/A & N/A \\
+10 & No & N/A & N/A & 25 & No & N/A & N/A \\
+11 & No & N/A & N/A & 26 & No & N/A & N/A \\
+12 & No & N/A & N/A & 27 & No & N/A & N/A \\
+13 & No & N/A & N/A & 28 & No & N/A & N/A \\
+14 & No & N/A & N/A & 29 & No & N/A & N/A \\
+15 & No & N/A & N/A & 30 & No & N/A & N/A \\ \hline
+\end{tabular}%
+}
+\caption{30 runs of Recorded Performance for High Noise to Low Noise}
+\label{tab:high_to_low}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+
+\resizebox{\textwidth}{!}{
+\begin{tabular}{|l|l|l|l|l|l|l|l|}
+\hline
+\textbf{Run} & \textbf{Investigated?} & \textbf{Outcome} & \textbf{StDev} & \textbf{Run} & \textbf{Investigated?} & \textbf{Outcome} & \textbf{StDev} \\ \hline
+1  & Yes & Cleared  & 0.0372 & 16 & Yes & Cleared  & 0.0381 \\
+2  & Yes & Cleared  & 0.0466 & 17 & Yes & Cleared  & 0.0423 \\
+3  & Yes & Cleared  & 0.0494 & 18 & Yes & Cleared  & 0.0510 \\
+4  & Yes & Detected & 0.0141 & 19 & Yes & Cleared  & 0.0344 \\
+5  & Yes & Cleared  & 0.0369 & 20 & Yes & Cleared  & 0.0418 \\
+6  & Yes & Cleared  & 0.0460 & 21 & Yes & Cleared  & 0.0491 \\
+7  & Yes & Cleared  & 0.0531 & 22 & Yes & Detected & 0.0135 \\
+8  & Yes & Cleared  & 0.0354 & 23 & Yes & Cleared  & 0.0399 \\
+9  & Yes & Cleared  & 0.0475 & 24 & Yes & Cleared  & 0.0452 \\
+10 & Yes & Cleared  & 0.0235 & 25 & Yes & Cleared  & 0.0527 \\
+11 & Yes & Cleared  & 0.0412 & 26 & Yes & Cleared  & 0.0377 \\
+12 & Yes & Cleared  & 0.0388 & 27 & Yes & Cleared  & 0.0436 \\
+13 & Yes & Cleared  & 0.0505 & 28 & Yes & Cleared  & 0.0482 \\
+14 & Yes & Cleared  & 0.0441 & 29 & Yes & Cleared  & 0.0359 \\
+15 & Yes & Cleared  & 0.0298 & 30 & Yes & Cleared  & 0.0411 \\ \hline
+\end{tabular}%
+}
+\caption{30 runs of Recorded Performance for Low Noise to High Noise}
+\label{tab:low_to_high}
+\end{table}
 
 \end{document}
