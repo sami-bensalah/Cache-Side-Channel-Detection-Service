@@ -4,79 +4,73 @@
 \providecommand\HyField@AuxAddToCoFields[2]{}
 \citation{kernel_spectre}
 \citation{redhat2019}
+\citation{openshift_usage}
 \@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.1}Motivation}{1}{subsection.1.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {1.1.1}Public Cloud Vulnerability}{1}{subsubsection.1.1.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {1.1.2}Mitigation Effectiveness and Performance}{1}{subsubsection.1.1.2}\protected@file@percent }
-\citation{openshift_usage}
 \citation{arm_architecture}
 \citation{arm_architecture}
+\citation{spectre_og}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {1.1.3}OpenShift Clusters}{2}{subsubsection.1.1.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.2}Problem Definition}{2}{subsection.1.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {2}Project Background}{2}{section.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Cache Structure and Mapping}{2}{subsection.2.1}\protected@file@percent }
 \newlabel{sec:cache_structure}{{2.1}{2}{Cache Structure and Mapping}{subsection.2.1}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Tag, Index, and Offset bits of a physical memory address for cache mapping \cite  {arm_architecture}}}{2}{figure.1}\protected@file@percent }
-\newlabel{fig:cache_mapping}{{1}{2}{Tag, Index, and Offset bits of a physical memory address for cache mapping \cite {arm_architecture}}{figure.1}{}}
-\citation{spectre_og}
-\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Microarchitectural cache specifications of the lab cluster node.}}{3}{table.1}\protected@file@percent }
-\newlabel{tab:cache_specs_grid}{{1}{3}{Microarchitectural cache specifications of the lab cluster node}{table.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces \small  {Tag, Index, and Offset bits of a physical memory address for cache mapping \cite  {arm_architecture}}}}{2}{figure.1}\protected@file@percent }
+\newlabel{fig:cache_mapping}{{1}{2}{\small {Tag, Index, and Offset bits of a physical memory address for cache mapping \cite {arm_architecture}}}{figure.1}{}}
+\citation{prime_probe_img}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Spectre V1 (Bounds Check Bypass)}{3}{subsection.2.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Cache Timing Side-Channels}{3}{subsection.2.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {2.3.1}Flush+Reload}{3}{subsubsection.2.3.1}\protected@file@percent }
-\citation{prime_probe_img}
-\citation{prime_probe_img}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.3.2}Prime+Probe}{3}{subsubsection.2.3.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Prime + Probe cache attacks, cache hits or cache misses. \cite  {prime_probe_img}}}{3}{figure.2}\protected@file@percent }
+\newlabel{fig:prime_probe}{{2}{3}{Prime + Probe cache attacks, cache hits or cache misses. \cite {prime_probe_img}}{figure.2}{}}
 \citation{arm_pmu}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.3.2}Prime+Probe}{4}{subsubsection.2.3.2}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Prime + Probe cache attacks. The timing difference (cache hits or cache misses) discloses the victim's access pattern. \cite  {prime_probe_img}}}{4}{figure.2}\protected@file@percent }
-\newlabel{fig:prime_probe}{{2}{4}{Prime + Probe cache attacks. The timing difference (cache hits or cache misses) discloses the victim's access pattern. \cite {prime_probe_img}}{figure.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}PMU and Hardware Counters}{4}{subsection.2.4}\protected@file@percent }
 \citation{scadet}
 \citation{cloudradar}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.5}OpenShift}{5}{subsection.2.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3}Reviewing of Existing Solutions Methods}{5}{section.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}SCADET - Pre-deployment Static Binary Scanning}{5}{subsection.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}CloudRadar - Hypervisor-Level System Profiling}{5}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}PMU and Hardware Counters}{4}{subsection.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5}Red Hat OpenShift Container Platform (RHOCP)}{4}{subsection.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Reviewing of Existing Solutions Methods}{4}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}SCADET - Pre-deployment Static Binary Scanning}{4}{subsection.3.1}\protected@file@percent }
 \citation{spypmu}
 \citation{verizon}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}SPY-PMU - Weaponization of Hardware Telemetry}{6}{subsection.3.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Existing Solutions Evaluation}{6}{subsection.3.4}\protected@file@percent }
-\newlabel{tab:existing_solutions}{{3.4}{6}{Existing Solutions Evaluation}{subsection.3.4}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Comparison of existing cache side channel detection solutions and scope}}{6}{table.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4}Methodology}{6}{section.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Experimental Setup}{6}{subsection.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Hardware and System Specifications}{6}{subsection.4.2}\protected@file@percent }
-\newlabel{tab:hardware_specs}{{4.2}{6}{Hardware and System Specifications}{subsection.4.2}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Lab Environment Hardware Specifications}}{6}{table.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Attack Decisions}{6}{subsection.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.1}Victim Purpose and Vulnerability Mechanism}{6}{subsubsection.4.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.2}Side Channel}{7}{subsubsection.4.3.2}\protected@file@percent }
-\newlabel{tab:cache_attacks}{{4.3.2}{7}{Side Channel}{subsubsection.4.3.2}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Evaluation of Cache Side-Channel Attacks on Public Cloud Environments}}{7}{table.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Detection Logic and Threshold Analysis}{8}{subsection.4.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.4.1}Initial Detection Method}{8}{subsubsection.4.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.4.2}Final Revised Detction Method}{8}{subsubsection.4.4.2}\protected@file@percent }
-\newlabel{eq:model}{{1}{8}{Final Revised Detction Method}{equation.4.1}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Capture of LLC Miss Ratio Metrics From Time Series Database}}{9}{figure.3}\protected@file@percent }
-\newlabel{fig:llc_ratio}{{3}{9}{Capture of LLC Miss Ratio Metrics From Time Series Database}{figure.3}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5}Implementation}{9}{section.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Architecture Overview}{9}{subsection.5.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces System Architecture Of Proposed Detector Deployment in a Mulit-Tenant Environment}}{9}{figure.4}\protected@file@percent }
-\newlabel{fig:sys_design}{{4}{9}{System Architecture Of Proposed Detector Deployment in a Mulit-Tenant Environment}{figure.4}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Telemetry and Metric Collection}{10}{subsection.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Detection}{10}{subsection.5.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Victim and Spectre Gadget}{10}{subsection.5.4}\protected@file@percent }
-\newlabel{lst:spectre}{{1}{11}{Spectre Gadget in Victim.c}{lstlisting.1}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {1}Spectre Gadget in Victim.c}{11}{lstlisting.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {5.4.1}Flush+Reload Validation}{11}{subsubsection.5.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Prime+Probe over HTTP Implementation}{11}{subsection.5.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {5.5.1}L1 Targeting}{11}{subsubsection.5.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {5.5.2}Last Level Cache Targeting}{11}{subsubsection.5.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6}Results - Solution performance}{12}{section.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Stationary Load Scenarios}{12}{subsection.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Dynamic Environmental Scenarios}{13}{subsection.6.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Implementation Overhead}{13}{subsection.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{13}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}CloudRadar - Hypervisor-Level System Profiling}{5}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}SPY-PMU - Weaponization of Hardware Telemetry}{5}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Existing Solutions Evaluation}{5}{subsection.3.4}\protected@file@percent }
+\newlabel{tab:existing_solutions}{{3.4}{5}{Existing Solutions Evaluation}{subsection.3.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces \small  {Comparison of existing cache side channel detection solutions and scope}}}{5}{table.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Methodology}{5}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Hardware and System Specifications}{5}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Attack Decisions}{5}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.1}Victim Purpose and Vulnerability Mechanism}{5}{subsubsection.4.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.2}Side Channel}{6}{subsubsection.4.2.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces \small  {Evaluation of Cache Side-Channel Attacks on Public Cloud Environments}}}{6}{table.2}\protected@file@percent }
+\newlabel{tab:cache_attacks}{{2}{6}{\small {Evaluation of Cache Side-Channel Attacks on Public Cloud Environments}}{table.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Detection Logic and Threshold Analysis}{6}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.1}Initial Detection Method}{7}{subsubsection.4.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.2}Final Revised Detction Method}{7}{subsubsection.4.3.2}\protected@file@percent }
+\newlabel{eq:model}{{1}{7}{Final Revised Detction Method}{equation.4.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Capture of LLC Miss Ratio Metrics From Time Series Database}}{7}{figure.3}\protected@file@percent }
+\newlabel{fig:llc_ratio}{{3}{7}{Capture of LLC Miss Ratio Metrics From Time Series Database}{figure.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Implementation}{8}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Architecture Overview}{8}{subsection.5.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces System Architecture Of Proposed Detector Deployment in a Mulit-Tenant Environment}}{8}{figure.4}\protected@file@percent }
+\newlabel{fig:sys_design}{{4}{8}{System Architecture Of Proposed Detector Deployment in a Mulit-Tenant Environment}{figure.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Telemetry and Metric Collection}{8}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Detection}{8}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Victim and Spectre Gadget}{9}{subsection.5.4}\protected@file@percent }
+\newlabel{lst:spectre}{{1}{9}{\small {Spectre Gadget in victim.c}}{lstlisting.1}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {1}\small  {Spectre Gadget in victim.c}}{9}{lstlisting.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {5.4.1}Flush+Reload Validation}{9}{subsubsection.5.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Prime+Probe over HTTP Implementation}{9}{subsection.5.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {5.5.1}L1 Targeting}{9}{subsubsection.5.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {5.5.2}Last Level Cache Targeting}{10}{subsubsection.5.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Results - Solution performance}{10}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Attack Run Scenarios}{10}{subsection.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Changing Service Load Scenarios}{11}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Implementation Overhead}{11}{subsection.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{11}{section.7}\protected@file@percent }
 \bibcite{kernel_spectre}{1}
 \bibcite{redhat2019}{2}
 \bibcite{openshift_usage}{3}
@@ -89,16 +83,20 @@
 \bibcite{cloudradar}{10}
 \bibcite{spypmu}{11}
 \bibcite{verizon}{12}
-\@writefile{toc}{\contentsline {section}{\numberline {A}Performance Evaluatation}{15}{appendix.A}\protected@file@percent }
-\newlabel{appendix:A}{{A}{15}{Performance Evaluatation}{appendix.A}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces 30 runs of Recorded Performance for Low Noise to Attack}}{15}{table.5}\protected@file@percent }
-\newlabel{tab:cache_attacks_low}{{5}{15}{30 runs of Recorded Performance for Low Noise to Attack}{table.5}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces 30 runs of Recorded Performance for Moderate Noise to Attack}}{15}{table.6}\protected@file@percent }
-\newlabel{tab:cache_attacks_mod}{{6}{15}{30 runs of Recorded Performance for Moderate Noise to Attack}{table.6}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces 30 runs of Recorded Performance for High Noise to Attack}}{16}{table.7}\protected@file@percent }
-\newlabel{tab:cache_attacks_high}{{7}{16}{30 runs of Recorded Performance for High Noise to Attack}{table.7}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces 30 runs of Recorded Performance for High Noise to Low Noise}}{16}{table.8}\protected@file@percent }
-\newlabel{tab:high_to_low}{{8}{16}{30 runs of Recorded Performance for High Noise to Low Noise}{table.8}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces 30 runs of Recorded Performance for Low Noise to High Noise}}{17}{table.9}\protected@file@percent }
-\newlabel{tab:low_to_high}{{9}{17}{30 runs of Recorded Performance for Low Noise to High Noise}{table.9}{}}
-\gdef \@abspage@last{17}
+\@writefile{toc}{\contentsline {section}{\numberline {A}Performance Evaluatation}{13}{appendix.A}\protected@file@percent }
+\newlabel{appendix:A}{{A}{13}{Performance Evaluatation}{appendix.A}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces \small  {Lab Environment Hardware Specifications}}}{13}{table.3}\protected@file@percent }
+\newlabel{tab:hardware_specs}{{3}{13}{\small {Lab Environment Hardware Specifications}}{table.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Microarchitectural cache specifications of the lab cluster node.}}{13}{table.4}\protected@file@percent }
+\newlabel{tab:cache_specs_grid}{{4}{13}{Microarchitectural cache specifications of the lab cluster node}{table.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces 30 runs of Recorded Performance for Low Noise to Attack}}{13}{table.5}\protected@file@percent }
+\newlabel{tab:cache_attacks_low}{{5}{13}{30 runs of Recorded Performance for Low Noise to Attack}{table.5}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces 30 runs of Recorded Performance for Moderate Noise to Attack}}{14}{table.6}\protected@file@percent }
+\newlabel{tab:cache_attacks_mod}{{6}{14}{30 runs of Recorded Performance for Moderate Noise to Attack}{table.6}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces 30 runs of Recorded Performance for High Noise to Attack}}{14}{table.7}\protected@file@percent }
+\newlabel{tab:cache_attacks_high}{{7}{14}{30 runs of Recorded Performance for High Noise to Attack}{table.7}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces 30 runs of Recorded Performance for High Noise to Low Noise}}{15}{table.8}\protected@file@percent }
+\newlabel{tab:high_to_low}{{8}{15}{30 runs of Recorded Performance for High Noise to Low Noise}{table.8}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces 30 runs of Recorded Performance for Low Noise to High Noise}}{15}{table.9}\protected@file@percent }
+\newlabel{tab:low_to_high}{{9}{15}{30 runs of Recorded Performance for Low Noise to High Noise}{table.9}{}}
+\gdef \@abspage@last{15}
