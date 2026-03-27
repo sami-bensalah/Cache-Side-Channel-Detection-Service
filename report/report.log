@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2026.3.9)  27 MAR 2026 22:08
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2026.3.9)  27 MAR 2026 22:21
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -679,13 +679,10 @@ LaTeX Font Warning: Some font shapes were not available, defaults substituted.
 LaTeX Warning: There were undefined references.
 
 
-Package rerunfilecheck Warning: File `report.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
+LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
 
-Package rerunfilecheck Info: Checksums for `report.out':
-(rerunfilecheck)             Before: 7F4DA3091D969FF770A524C1AE892741;8112
-(rerunfilecheck)             After:  8950A0C9D81552FB3C78F0E74683CA71;8132.
+Package rerunfilecheck Info: File `report.out' has not changed.
+(rerunfilecheck)             Checksum: 8950A0C9D81552FB3C78F0E74683CA71;8132.
  ) 
 Here is how much of TeX's memory you used:
  12886 strings out of 476182
@@ -709,7 +706,7 @@ m/cmr9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10
 .pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb><
 /usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></usr/s
 hare/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt9.pfb>
-Output written on report.pdf (15 pages, 723975 bytes).
+Output written on report.pdf (15 pages, 723978 bytes).
 PDF statistics:
  427 PDF objects out of 1000 (max. 8388607)
  371 compressed objects within 4 object streams
