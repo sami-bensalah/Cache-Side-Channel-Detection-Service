@@ -166,7 +166,7 @@ If an anomaly is detected by the PID's regression model the [ANOMALY DETECTED] l
 If 20 anomalies are collected, the threshold comparison check is run and the anomalies' standard deviation is outputted:
 ```bash
 # output of calculated StDev example
-[INFO][PID 9206] Anomolous measurements' standard deviation: 0.007073511906022402 | POD: example-pod
+[INFO][PID 9206] Anomolous measurements\' standard deviation: 0.007073511906022402 | POD: example-pod
 ```
 
 If an anomaly is cleared from attack suspection, the [CLEARED] log is printed
