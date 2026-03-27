@@ -23,6 +23,47 @@ The system consists of two primary components deployed within a single administr
 
 
 ## Deployment & Execution Run-Book
+Install OpenShift Local v4.19.8 (from https://console.redhat.com/openshift/create/local), start the cluster and login as an admin
+
+Create the two following namespaces:
+```bash
+# detector and collector namespace
+oc new-project collector
+
+# victim namespace
+oc new-project spectre-victim
+```
+
+### 0. Build Victim and Detector images
+Build the images below and add them to the Red Hat OpenShift Image registry
+
+Build Images:
+```bash
+# build detector image
+podman build detector/Dockerfile --tag perf-collector
+
+# build victim image
+podman build victim-service/Dockerfile --tag victim
+```
+Add to RHOCP Image Registry:
+```bash
+# store login token to env var
+TOKEN=$(oc whoami -t)
+
+# copy detector image into RHOCP registry
+podman unshare skopeo copy \
+  containers-storage:localhost/perf-collector:latest \
+  docker://default-route-openshift-image-registry.apps-crc.testing/collector/perf-collector:latest \
+  --dest-creds developer:$TOKEN\
+  --dest-tls-verify=false
+
+# copy victim image into RHOCP registry
+podman unshare skopeo copy \
+  containers-storage:localhost/victim:latest \
+  docker://default-route-openshift-image-registry.apps-crc.testing/spectre-victim/victim:latest \
+  --dest-creds developer:$TOKEN\
+  --dest-tls-verify=false
+```
 
 ### 1. Cluster & Defensive Setup
 Set up the monitoring namespace, Prometheus time-series DB, and the Python collector/detector.
