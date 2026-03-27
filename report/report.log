@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2026.3.9)  27 MAR 2026 00:41
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2026.3.9)  27 MAR 2026 22:08
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -528,14 +528,19 @@ File: images/memaddr_format.png Graphic file (type png)
 <use images/memaddr_format.png>
 Package pdftex.def Info: images/memaddr_format.png  used on input line 120.
 (pdftex.def)             Requested size: 238.04741pt x 30.78583pt.
- [2
+
+
+LaTeX Warning: Reference `appends in Figureix:A' on page 2 undefined on input l
+ine 126.
+
+[2
 pdfTeX warning (ext4): destination with the same identifier (name{figure.1}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.140 \subsection{Cache Timing Side-Channels}
                                               <./images/memaddr_format.png>]
-<images/prime_probe.png, id=210, 853.1875pt x 457.71pt>
+<images/prime_probe.png, id=208, 853.1875pt x 457.71pt>
 File: images/prime_probe.png Graphic file (type png)
 <use images/prime_probe.png>
 Package pdftex.def Info: images/prime_probe.png  used on input line 156.
@@ -566,54 +571,55 @@ pdfTeX warning (ext4): destination with the same identifier (name{table.2}) has
                                                   \__shipout_drop_firstpage_...
 l.307 \end{itemize}
                    ]
-<images/llc_ratio.png, id=252, 1389.19pt x 392.46625pt>
+<images/llc_ratio.png, id=250, 1389.19pt x 392.46625pt>
 File: images/llc_ratio.png Graphic file (type png)
 <use images/llc_ratio.png>
 Package pdftex.def Info: images/llc_ratio.png  used on input line 334.
 (pdftex.def)             Requested size: 333.26491pt x 94.15189pt.
-<images/defense_architecture.png, id=254, 1127.21124pt x 635.37375pt>
-File: images/defense_architecture.png Graphic file (type png)
-<use images/defense_architecture.png>
-Package pdftex.def Info: images/defense_architecture.png  used on input line 35
-6.
-(pdftex.def)             Requested size: 333.26491pt x 187.85051pt.
  [7
 pdfTeX warning (ext4): destination with the same identifier (name{figure.3}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.360 
-       <./images/llc_ratio.png>]
-Overfull \hbox (19.44157pt too wide) in paragraph at lines 366--372
+l.355 \end{quote}
+                  <./images/llc_ratio.png>]
+<images/defense_architecture.png, id=262, 1127.21124pt x 635.37375pt>
+File: images/defense_architecture.png Graphic file (type png)
+<use images/defense_architecture.png>
+Package pdftex.def Info: images/defense_architecture.png  used on input line 35
+9.
+(pdftex.def)             Requested size: 333.26491pt x 187.85051pt.
+
+Overfull \hbox (19.44157pt too wide) in paragraph at lines 369--375
 \OT1/cmr/m/n/10.95 query run-ning con-tainer PIDs. Cache met-rics are col-lecte
 d with \OT1/cmtt/m/n/10.95 perf stat -e <event-counter-names>
  []
 
 LaTeX Font Info:    Trying to load font information for OMS+cmtt on input line 
-383.
-LaTeX Font Info:    No file OMScmtt.fd. on input line 383.
+386.
+LaTeX Font Info:    No file OMScmtt.fd. on input line 386.
 
 LaTeX Font Warning: Font shape `OMS/cmtt/m/n' undefined
 (Font)              using `OMS/cmsy/m/n' instead
-(Font)              for symbol `textbraceleft' on input line 383.
+(Font)              for symbol `textbraceleft' on input line 386.
 
 [8
 pdfTeX warning (ext4): destination with the same identifier (name{figure.4}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.389 \subsection{Victim and Spectre Gadget}
-                                             <./images/defense_architecture.png
->] (/usr/share/texlive/texmf-dist/tex/latex/listings/lstlang1.sty
+l.391 
+       <./images/defense_architecture.png>]
+(/usr/share/texlive/texmf-dist/tex/latex/listings/lstlang1.sty
 File: lstlang1.sty 2023/02/27 1.9 listings language file
 )
 (/usr/share/texlive/texmf-dist/tex/latex/listings/lstmisc.sty
 File: lstmisc.sty 2023/02/27 1.9 (Carsten Heinz)
 )
 Package hyperref Info: bookmark level for unknown lstlisting defaults to 0 on i
-nput line 400.
+nput line 403.
  [9] [10]
-Overfull \hbox (5.46242pt too wide) in paragraph at lines 494--498
+Overfull \hbox (5.46242pt too wide) in paragraph at lines 497--501
 \OT1/cmr/m/n/10.95 In lim-ited re-source cloud en-vi-ron-ments its im-protant t
 o be able to de-ploy ef-fi-cient and low-consumption
  []
@@ -623,43 +629,43 @@ pdfTeX warning (ext4): destination with the same identifier (name{table.3}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.763 \end{document}
+l.766 \end{document}
                     
 pdfTeX warning (ext4): destination with the same identifier (name{table.4}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.763 \end{document}
+l.766 \end{document}
                     
 pdfTeX warning (ext4): destination with the same identifier (name{table.5}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.763 \end{document}
+l.766 \end{document}
                     ] [14
 pdfTeX warning (ext4): destination with the same identifier (name{table.6}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.763 \end{document}
+l.766 \end{document}
                     
 pdfTeX warning (ext4): destination with the same identifier (name{table.7}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.763 \end{document}
+l.766 \end{document}
                     ] [15
 pdfTeX warning (ext4): destination with the same identifier (name{table.8}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.763 \end{document}
+l.766 \end{document}
                     
 pdfTeX warning (ext4): destination with the same identifier (name{table.9}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.763 \end{document}
+l.766 \end{document}
                     ] (./report.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
@@ -669,14 +675,23 @@ L3 programming layer <2024-01-22>
 
 LaTeX Font Warning: Some font shapes were not available, defaults substituted.
 
-Package rerunfilecheck Info: File `report.out' has not changed.
-(rerunfilecheck)             Checksum: D03FDEC97A182D228686C49FA458E6FB;8037.
+
+LaTeX Warning: There were undefined references.
+
+
+Package rerunfilecheck Warning: File `report.out' has changed.
+(rerunfilecheck)                Rerun to get outlines right
+(rerunfilecheck)                or use package `bookmark'.
+
+Package rerunfilecheck Info: Checksums for `report.out':
+(rerunfilecheck)             Before: 7F4DA3091D969FF770A524C1AE892741;8112
+(rerunfilecheck)             After:  8950A0C9D81552FB3C78F0E74683CA71;8132.
  ) 
 Here is how much of TeX's memory you used:
- 12883 strings out of 476182
- 194386 string characters out of 5795596
- 1992975 words of memory out of 5000000
- 34649 multiletter control sequences out of 15000+600000
+ 12886 strings out of 476182
+ 194463 string characters out of 5795596
+ 1991975 words of memory out of 5000000
+ 34652 multiletter control sequences out of 15000+600000
  566468 words of font info for 65 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
  75i,12n,79p,769b,1409s stack positions out of 10000i,1000n,20000p,200000b,200000s
@@ -694,10 +709,10 @@ m/cmr9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10
 .pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb><
 /usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></usr/s
 hare/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt9.pfb>
-Output written on report.pdf (15 pages, 724400 bytes).
+Output written on report.pdf (15 pages, 723975 bytes).
 PDF statistics:
- 429 PDF objects out of 1000 (max. 8388607)
- 373 compressed objects within 4 object streams
+ 427 PDF objects out of 1000 (max. 8388607)
+ 371 compressed objects within 4 object streams
  88 named destinations out of 1000 (max. 500000)
  357 words of extra memory for PDF output out of 10000 (max. 10000000)
 

@@ -81,12 +81,12 @@ no guarantee that all possible attack vectors for spectre variant 1 are covered'
 is defensive programming by inserting LFENCEs before vulnerable branches, however, in certain constrained systems constant instruction fences are not 
 feasible, leading to extremely vulnerable processes being in production. 
 
-This performance degradation was also noted by Red Hat with their own kernel patches where they mentioned that speculative execution is a performance 
+This performance hit was also noted by Red Hat with their own kernel patches where they mentioned that speculative execution is a performance 
 optimization which their updates change (both kernel and microcode), resulting in workload-specific performance degradation~\cite{ redhat2019}. 
 Despite Red Hat having these denfenses enabled by default, the performance penalty is severe enough that Red Hat and the Linux kernel provide mechanisms 
 to bypass these protections. Resulting in various insecure environments possibly running with no mitigations enabled in the cloud.
 
-\subsubsection{OpenShift Clusters}
+\subsubsection{Red Hat OpenShift Container Platform (RHOCP) Clusters}
 OpenShift clusters are an industry standard method of deploying applications onto cloud infrastructure securely and effectively, with 
 50\% of Fortune 100 companies using RHOCP (2019)~\cite{openshift_usage}. This huge client base results in a large 
 number of services running on these clusters, and in very few cases are the clusters not hosted on a type of cloud infrastructure. 
@@ -94,7 +94,7 @@ As discussed previously, this leads to the possibility of being a target of a si
 
 \subsection{Problem Definition}
 My motivation leads me to my goal for this project, which is detecting the occurence of a cache side-channel attack on monitored services within
-the RHOCP cluster. The objective is to remove the need to decide between prioritising performance over security and allow a more globally 
+the RHOCP cluster in real-time. The objective is to remove the need to decide between prioritising performance over security and allow a more globally 
 usable mitigation strategy independent of the underlying environment architecture. So, rather than having to employ hard counters to the attacks, 
 such as the software and hardware mitigations for spectre available, we instead employ a soft mitigation strategy, which involves a detector 
 leveraging ML models to detect anomalies and send a trustable signal if an attack is occuring live. This is to facilitate the triggering of 
@@ -112,20 +112,20 @@ defensive actions, such as moving a service onto a different cluster node runnin
 \section{Project Background}
 \subsection{Cache Structure and Mapping}
 \label{sec:cache_structure}
-Cache is structured with levels, most commonly with a 3 level cache design which is made up of L1, L2 and L3/LLC (Last Level Cache).
-In many ARM systems, you can have distinct instruction and data level 1 caches backed by a 'unified' level for L2 and L3~\cite{arm_architecture}.
-Each cache level consists of sets, ways and lines. A set defines a region of cache where memory addresses will map to based on the value of the address' index bits, as highlighted in Figure \ref{fig:cache_mapping}.
+Cache is structured by levels, most commonly with a 3 level cache design which is made up of L1, L2 and L3/LLC (Last Level Cache).
+In many ARM systems, you can have distinct instruction and data L1 caches backed by a 'unified' level for L2 and L3~\cite{arm_architecture}.
+Each cache level consists of sets, ways and lines. A set defines a region of cache where memory addresses will map to based on the value of the address' index bits, as seen in Figure \ref{fig:cache_mapping}.
 \begin{figure}[H] 
     \centering
     \includegraphics[width=0.5\textwidth]{images/memaddr_format.png}
     \caption{\small{Tag, Index, and Offset bits of a physical memory address for cache mapping \cite{arm_architecture}}}
     \label{fig:cache_mapping}
 \end{figure}
-Associativity defines the number of ways (individual cache lines) within a set and a cache line (64 bytes) refers to a `cell' or space within the set that a memory address store its data.
+Associativity defines the number of ways (individual cache lines) within a set and a cache line (64 bytes) refers to a `cell' or space within the set that a memory address can store its data in.
 Associativity changes depending on the system architecture and cache level. Higher levels of cache often have higher associativity resulting in more lines within the set and a higher cache 
-capacity as seen in Table \ref{tab:cache_specs_grid} in Appendix \ref{appendix:A}, which outlines the lab machine's cache configuration.  
+capacity as seen in Table \ref{tab:cache_specs_grid} in Appendix \ref{appends in Figureix:A}, which outlines the lab machine's cache configuration.  
 
-Another term which will be referenced is cache stride (or set stride), which refers to the number of indexes within a byte array which correspond 
+Another term which will be referenced is cache stride (or set stride), which in this paper refers to the number of indexes within a byte array which correspond 
 to memory addresses that map to the same set (i.e., have the same index bits). It is often the size of a page of memory (4096 bytes for standard pages) 
 but is dependent on the data type of the array/list of the probe array. Its primary function for an attacker which will be discussed further is to build eviction sets 
 (a collection of addresses which can `take over' a cache set).
@@ -135,20 +135,20 @@ but is dependent on the data type of the array/list of the probe array. Its prim
 Spectre V1 is an attack that targets and exploits conditional branches. The attacker mistrains the CPU’s BP into mispredicting the direction of a branch, causing the CPU to temporarily violate program semantics by executing code that would not have been executed otherwise~\cite{spectre_og}.
 This act of training the branch predictor can also be referred to as poisoning, and within modern CPUs, there are two primary mechanisms for branch prediction: global and local.
 Local branch predictors look at each branch instruction individually and base their prediction independent of the rest of the program's execution, they are the target of the attacks outlined in this report.
-So, although the architectural state is rolled back when the CPU realises its misprediction, a `footprint' is left behind in cache. The code within the branch 
-known as a spectre `gadget' is in place within the victim's vulnerable branch.
+So, although the architectural state is rolled back when the CPU realises its misprediction, a `footprint' is left behind in cache. The vulnerable code executed within the branch, 
+is known as a spectre `gadget'.
 \subsection{Cache Timing Side-Channels}
-A side channel attack is any unintended side effect which can be measured to infer information during a program's execution. In this report I will be discussing side-channel cache timing attacks enabled by the spectre v1 gadget.
+A side channel attack is any unintended side effect which can be measured to infer information from a program's execution. In this report I will be discussing side-channel cache timing attacks enabled by the spectre v1 gadget.
 \subsubsection{Flush+Reload}
 Flush+Reload is an attack used in the majority of research papers on spectre, employing it as a mechanism to read the cache residue caused by the transient execution.
-It involves flushing a targeted address' data from memory, spectre is then triggered and if the spectre gadget maps to that flushed address it speculatively accesses it. We then perform the reload which is where we measure our timing side-channel, 
+It involves flushing a target address' data from memory, spectre is then triggered and if the spectre gadget maps to that flushed address it speculatively accesses it. We then perform the reload which is where we measure our timing side-channel, 
 this involves measuring the fetch time using hardware level timers. If the fetch time is under a certain cycle threshold then we can infer that the address, though it was previously flushed, is now in cache, meaning that it was used speculatively.
 
 \subsubsection{Prime+Probe}
 Prime+Probe is a significantly more sophisticated approach in comparison to Flush+Reload as, rather than relying on access to a shared program memory space, it instead requires a shared environment on the hardware level only.
 
-Prime+Probe begins with the priming phase, which involves creating an eviction set targeting a specific cache set (Step 1 of Figure \ref{fig:prime_probe}), as discussed in Section \ref{sec:cache_structure}. This noramlly involves requesting a large portion of memory by creating a large array of several megabytes and picking out useful memory addresses to use in the attack. 
-The spectre gadget will then be triggered causing the victim to touch the cache and evict an address from the eviction set (Step 2 of Figure \ref{fig:prime_probe}). During the prime phase the attacker fetches and times each addresses to see if there have been any evictions (i.e., has the attacker data has been forced out of cache by victim activity).
+Prime+Probe begins with the priming phase, which involves creating an eviction set targeting a specific cache set and loading it into cache (Step 1 of Figure \ref{fig:prime_probe}). This normally involves requesting a portion of memory by creating a large `probe' array of several megabytes and picking out useful memory addresses to use in the attack. 
+The spectre gadget will then be triggered causing the victim to touch the cache and evict an address from the eviction set (Step 2 of Figure \ref{fig:prime_probe}). During the probe phase the attacker measures the access times for each address in the eviction set to see if there have been any evictions (i.e., has the attacker data has been forced out of cache by victim activity).
 If the address data has been evicted then it is classified as a `cache miss' (Step 3, Figure \ref{fig:prime_probe}) and if it is fetched in expected time (i.e., it is in cache) then it is classified as a `cache hit'. 
 
 \begin{figure}[H] 
@@ -158,8 +158,8 @@ If the address data has been evicted then it is classified as a `cache miss' (St
     \label{fig:prime_probe}
 \end{figure}
 
-Cache is inherently noisy and evictions are constantly occurring leading to various misses during system runtime. Meaning that the attack will 
-result in various false misses, where the probe phase identifies that an address' data has been replaced, in a quiet system it is most likely due to 
+Cache is inherently noisy and evictions are constantly occurring, leading to various misses during system runtime. Meaning that the attack will 
+end up measuring various misses not caused by the victim. In a quiet system it is most likely due to 
 the victim, however, in noisier multi-tenant cloud systems noise will be introduced by a third party, such as other users, kernel activities or other 
 cluster services. This makes Prime+Probe less reliable on noisier systems which in most cases is fixed by increasing the number of repeat runs by 10s of 
 thousands to ensure that the cache signal is true.
@@ -168,9 +168,9 @@ In addition, the difficulty of building the eviction set required for the attack
 targeting attack due to the size of LLC and the LLC slicing algorithm in modern processors.
 
 \subsection{PMU and Hardware Counters}
-The Performance Monitoring Unit (PMU) refers to a unit within the CPU which collects hardware counters for specific CPU events, which include low level 
+The Performance Monitoring Unit (PMU) refers to a unit within the CPU which collects hardware counters for specific CPU events, including low level 
 cache hardware events.
-These cache event counters are of specific interest for this project and provide a way to effectively investigate performance profiling and debugging. 
+These cache event counters are of specific interest for this project and provide a way to effectively analyse of cache noise and diagnose attacks. 
 The PMU is used by various performance analysis tools and in this study I will employing the use of the 
 Linux Perf tool, native to all linux kernels, making it suitable for a portable detection algorithm for various Linux based environements~\cite{arm_pmu}. 
 \subsection{Red Hat OpenShift Container Platform (RHOCP)}
@@ -182,11 +182,11 @@ In multi-tenant environments, this architecture allows for the following attack 
 \begin{itemize}[nosep]
     \item Cross Service Attack: {When a malicious container is injected into the openshift cluster using the same resources, allowing for access to all levels of cache used by the victim}
     \smallskip
-    \item Hyper Threading Vulnerability: {The cluster may have reserved a full logical core, but it is not physical, a logically seperated core does not have an isolated cache, leading to an opportunity for an attack to exploit if ran on the sibling core.}
+    \item Hyper Threading Vulnerability: {The cluster may have reserved a full logical core, but it is not physical, a logically seperated core does not have an isolated cache, leading to an opportunity for an attack to exploit it if ran on the sibling core.}
 \end{itemize}
 
 
-\section{Reviewing of Existing Solutions Methods}
+\section{Reviewing of Existing Solutions}
 \subsection{SCADET - Pre-deployment Static Binary Scanning}
 SCADET approaches the task of detecting by making use of dynamic binary analysis and instrumentation (via intel PIN) rather than reading hardware metrics. When binaries 
 are intialised it performs an isolated pre-run check which logs every touched memory address during a test run to determine if there is an ``invariant pattern'' 
@@ -204,13 +204,13 @@ This means it monitors microarchitectural anomalies, using PMU metrics, on a sys
 by monitoring hardware metrics and performance counters for individual application workloads. 
 CloudRadar performs real-time detection (unlike SCADET) by calssifying anomalies with various static and dynamic threshold checks based on metrics from the PMU, a similar technique which I also use.
 
-While effective for traditional cloud infrastructure, I found that this approach is architecturally incompatible with modern containerized SaaS (Software as a Service) platforms (containerised, client-serving applications) running on RHOCP clusters. 
-In a containerized SaaS environment, application pods share a single host kernel rather than running independent guest operating systems on top of a hypervisor, like a VM would. 
-Attempting to deploy hypervisor-level detection methods within a lightweight container would violate its portability and resource efficiency. 
+While effective for traditional cloud infrastructure, I found that this approach is architecturally incompatible with modern containerised SaaS (Software as a Service) platforms (containerised, client-serving applications) running on RHOCP clusters. 
+In a containerised SaaS environment, application pods share a single host kernel rather than running independent guest operating systems on top of a hypervisor, like a VM would. 
+Attempting to deploy hypervisor-level detection methods within a lightweight container would remove its portability and resource efficiency. 
 
 \subsection{SPY-PMU - Weaponization of Hardware Telemetry}
 Out of all mentioned methodologies and approaches SPY-PMU is the closest to my solution, however, with one critical distinction, it outlines an attack leveraging PMU metrics rather than defending. It uses PMU metrics to build ``classifiers using logistic regression, decision tree, k-nearest neighbors, and random forest ML models"~\cite{spypmu}. 
-While SPY-PMU highlights the severe privacy risks of exposed hardware counters in multi-tenant environments, it validates the premise of my 
+While SPY-PMU's purpose is to highlight the severe privacy risks of exposed hardware counters in multi-tenant environments, it validates the premise of my 
 project. Which is that microarchitectural PMU hardware metrics contain usable and valuable behavioral data, and, rather than exploiting these metrics to leak secrets, my solution 
 uses a similar implementation for classifying anomalies from a defensive standpoint.
 
@@ -247,7 +247,7 @@ a victim service for session token generation due to its increased likelihood of
 
 For the vulnerability mechanism needed within my server I researched two main options Meltdown and Spectre. Both provided excellent gadgets 
 for my side-channel attack method, however, they also needed to be realistic within the modeled cloud environment. This made Meltdown an unlikely
-candidate for my side-channel, as out of the two options, meltdown experienced neutralisng mitigations compared to spectre. KPTI (Kernel Page Table Isolation)
+candidate for my side-channel, as out of the two options, meltdown experienced more damning mitigations compared to spectre. KPTI (Kernel Page Table Isolation)
 negates it by forcing the OS to maintain two distinct page tables for every user process, no more unified table architecture.
 A further issue with Meltdown is that this mitigation is widely applied by major cloud providers and platforms by default (AWS, Azure, Google Cloud, RHOCP).
 
@@ -340,7 +340,7 @@ In addition, I noted that though it seemed during the attack the dead giveaway i
 would also occur when there was a decrease in container workload activity. So, the only unique trait of the attack's cache footprint was the
 lack of variation in recorded LLC Miss Ratios.
 
-To exploit this footprint I collect the last 20 recorded anomalies' LLC ratio, the standard deviation $\sigma_a$ of these 20 points is calculated 
+To exploit this footprint I collect the last 20 recorded anomalies' LLC ratios, the standard deviation $\sigma_a$ of these 20 points is calculated 
 and if $\sigma_a < 0.015$ then the current behaviour is classified as an attack.
 
 If it was not classified as an attack at this point then this signals that there has been a significant shift in the container's activity and a new model
@@ -350,6 +350,9 @@ resolved, if only one anomaly pops up and 10 sequential non-anomalous readings a
 and clears it to continue refreshing the model. 
 
 \section{Implementation}
+\begin{quote}
+\small \textbf{Reproducibility Note:} System examples, source code, container manifests and deployment instructions for replicating the lab are available in the project repository's README.md.
+\end{quote}
 \subsection{Architecture Overview}
 \begin{figure}[H]
     \centering
@@ -367,10 +370,10 @@ The collector then begins the scanning of targeted namespaces by using the crict
 Cache metrics are collected with \texttt{perf stat -e <event-counter-names> -p <PID>  sleep 1}. Sleep, determines the amount 
 of time the metrics are sampled over, which is 1 second. This introduces a rate limit for each PID's metric collection of one sample per second and the cache
 readings across that seconds are aggregated into one measurement. To remove this bottlneck when multiple different PIDs are being monitored simultaneously, multithreading
-was implemented so that each PID's metric collection was independent of others. Prior to this, there was a delay of $n$ seconds ($n = PID_count$) between
+was implemented so that each PID's metric collection was independent of others. Prior to this, there was a delay of $n$ seconds ($n$ = \emph{PID\_count}) between
 a specific process' cache measurements.
 
-The deployment was exposed internally as a service (a route only accessible within the cluster). The collector acted as a prometheus HTTP client, exposing 
+The collector deployment was exposed internally as a service (a route only accessible within the cluster). The collector acted as a prometheus HTTP client, exposing 
 metrics on the \texttt{/metrics} endpoint. I deployed a prometheus instance (time series database, image \texttt{prom/prometheus:v2.45.0}) into my detector namespace alongside my collector container. 
 The prometheus deployment was configured to scrape from \texttt{/metrics} endpoint every second (matching the rate of collection). 
 
@@ -382,17 +385,17 @@ significantly easier to investigate metrics as they were collected by \texttt{co
 Once a minute has passed since a PID has been detected and queried, a model is built, it is then updated on the last minute worth of all metrics queried 
 from the prometheus deployment with PromQL: \texttt{<metric>\{pid=<pid>\}[60s:1s]}. A model fit score and standard deviation for cache misses is then calculated.
 
-If a PID's measurements are classified as anomalous by the detector the LLC miss:ref ratio of the measurement is stored in a PID:<List> dictionary and 
+If a PID's measurements are classified as anomalous by the detector the LLC miss:ref ratio of the measurement is stored in a PID:[List] dictionary and 
 the methods outlined in Section 3.3.2 are used to classify if the noise variance is an attack or not. The model is then refreshed for the possible reasons 
 outlined in Section 3.3.2.
 
 \subsection{Victim and Spectre Gadget}
 The victim was implemented in C. The memory layout is structured in a way to allow for the spectre gadget to be used to access bytes of the secret signing
 key within the server. 
-The victim was designed to create new tcp socket connections for each request. This was revised during the development of the L1 Prime+Probe attack
+The victim was designed to create new TCP socket connections for each request. This was revised during the development of the L1 Prime+Probe attack
 due to issues with L1 thrashing caused by high network activty when managing new and existing client connections. To solve this the TCP connection type
 was changed to a persistent socket connection, reducing the number of connections needed during an attack from thousands (one per request) to one.
-The server accepts three fields via a POST request: Username, Password and ID. These fields are passed through to the \texttt{get token} function  
+The server accepts three fields via a POST request: Username, Password and ID. These fields are passed through to the \texttt{get\_token()} function  
 which generates a HMAC signed token based on time, username and ID using the signing key (after authorizing the user). 
 This function contains the spectre gadget, seen in Listing \ref{lst:spectre}.
 
@@ -410,28 +413,28 @@ memory, a common tactic used within servers to prevent memory contention between
 The adversary can send an out of bounds ID, and the server speculatively executes \texttt{layout.role\_binding.roles[user\_id]}, maybe accessing a secret key byte, 
 the value of the byte is then multiplied by the cache stride, allowing us to figure out an offset from the base of \texttt{layout.role\_usage}, where a certain byte value is expected to touch.
 During the development of the victim, there was difficulty in consistently firing Spectre V1. This was due to the stubborn local BP
-not taking to training done over HTTP requests easily. To guarantee speculation, the training was moved into the server just before the get\_token() call. 
+not taking to training done over HTTP requests easily. To guarantee speculation, the training was moved into the server just before the \texttt{get\_token()} call. 
 \subsubsection{Flush+Reload Validation}
 To validate the existence of the spectre v1 vulnerability within my server I designed a Flush+Reload attack ran from within the server's code to 
 test whether the transient execution of my spectre gadget was being triggered, allowing me to tune my gadget to be as reliable as possible. 
 
-\subsection{Prime+Probe over HTTP Implementation}
+\subsection{Prime+Probe over HTTP}
 \subsubsection{L1 Targeting}
-L1 cache was simple to target in comparison to LLC. It involved reserving a 2MB byte array and building an eviction set of 8 addresses (L1 is 8-way) for all 64 possible L1 sets.
+L1 cache was simple to target in comparison to LLC. It involved reserving a 2MB byte array and building an eviction set of 8 addresses (8-way L1) for all 64 possible L1 sets.
 Each evicition set was shuffled and stored as a linked list, as to avoid the pre-fetcher effecting activity. The prime+probe loop was split into two main stages, 
 baseline and attack measurement. For each stage the attack would prime the entire L1 cache, send a request, wait for the victim response and probe. 
 For the baseline run a valid ID was sent and for the attack run an invalid out of bounds ID was sent (with a value which overflowed onto a secret key byte).
 The difference in noise measured between the baseline and attack for each set after 10000 runs was calculated and the set with the largest difference was returned.
 
 The issue, mentioned in Section 4.4, was L1 thrashing due to high network activity. Making the returned suspected spectre touched sets incorrect, due to the 
-inconsistency in background system noise. In addition, the usability on my modelled multi-tenant environment was low, to use it I needed 
-to allocate the cluster a specific sibling core to the attacker's core and assign the victim service to it, which was complex and unrealistic.
+inconsistency in background system noise. In addition, the usability of applying L1 Prime+Probe on my modelled multi-tenant environment was low, to use it I needed 
+to allocate the cluster a specific sibling core to the attacker's core and assign the victim service to it, which was unexpectdedly complex to achieve.
 \subsubsection{Last Level Cache Targeting}
 LLC Prime+Probe used a similar approach for isolating spectre signal noise through baseline and attack run noise comparison, however, with two major changes.
-The method of building eviction sets and the way of targeting the attack, as well as dealing with 2x the number of ways (16). Due to LLC slicing, it was impossible to transfer the same implementation used for
+The method of building eviction sets and the way of targeting the attack, as well as dealing with 2x the number of ways (16). Due to LLC slicing, it was impossible to apply the same implementation used for
 L1 cache. Instead I provisoned a huge array (512MB), using 2MB huge pages (to reduce the number of TLB lookups). To build the eviction sets it 
 first receives an input for a byte to investigate and gets all addresses from my probe array which the spectre gadget could possibly map to and added them to a pool. 
-I then generated 6 slice sets (for 6 core processor) by adding 16 random addresses to a test pool $T$ and slowly growing and testing it against a random address $R$ to see if they evict it,
+I then generated 6 slice sets (my processor has 6 cores) by adding 16 random addresses to a test pool $T$ and slowly growing and testing it against a random address $R$ to see if they evict it,
 if they did then that new address pool $T$ was an eviction set for the slice set where $R$ maps to. I then shrink $T$ to the minimum size required of 16. This repeats until 6 unique sets are found.
 
 For each slice set prime+probe is performed 10000 times and the slice with the highest $|baseline - attack|$ is returned. The attacker repeats
@@ -460,13 +463,13 @@ This section evaluates the detector's efficacy when intercepting a side-channel 
     The detector performed perfectly when an attack was run against a model trained on low noise, it had no issues identifying anomalies and 
     attack occurences.
     \smallskip
-    \item Moderate-Noise Profile ($30 \text{ RPS}$): $83.3\%$ Detection Rate ($25/30$ runs) \\
-    The detector continued to successfully identify a change in activity and correctly flagged anomalous readings. While, successful detections remained stable, the five failed trials exhibited a $3\times$ spike in variance ($\sigma \approx 0.0210$) from the $0.007$ average. 
+    \item Moderate-Noise Profile ($30 \text{ RPS}$): $80\%$ Detection Rate ($24/30$ runs) \\
+    The detector continued to successfully identify a change in activity and correctly flagged anomalous readings. While, successful detections remained stable, the six failed trials exhibited a $3\times$ spike in variance ($\sigma \approx 0.0210$) from the $0.007$ average. 
     Implying that increased service load introduced minor cache line evictions and, resulting in a less predictable and transparent cache environment, making attack identification difficult.
     
     \item High-Noise Profile ($80 \text{ RPS}$): $63.3\%$ Detection Rate ($19/30$ runs) \\
     At $80 \text{ RPS}$, high container activity heavily thrashed the LLC. While $19$ of the 30 attack runs were successfully detected, the remaining $11$ failed trials displayed massive volatility ($\sigma > 0.0500$). Indicating that 
-    as the Signal-to-Noise Ratio (SNR) degraded, the detector struggled to differentiate between legitimate bursts of traffic and a cache side-channel.
+    as the signal to noise ratio degraded, the detector struggled to differentiate between legitimate bursts of traffic and a cache side-channel.
 \end{itemize}
 \medskip
 For all scenarios, readings caused by the attack footprint were successfully identified as anomalies 100\% of the time as seen in Tables \ref{tab:cache_attacks_low}, \ref{tab:cache_attacks_mod}, \ref{tab:cache_attacks_high} in Appendix \ref{appendix:A}.
@@ -475,7 +478,7 @@ sporadic cache activity. Resulting in polluted LLC miss:ref ratio readings for t
 believing its just noise.
 
 
-\subsection{Changing Service Load Scenarios}
+\subsection{Changing Service Activity Scenarios}
 This section evaluates how the solution responded to shifts in legitimate cluster workload activity and whether an attack was falsely perceived.
 \smallskip
 \begin{itemize}[nosep]
@@ -514,7 +517,7 @@ impossible for an attack to extract data in under 20 seconds when targeting serv
 This bottleneck is caused by the one second scrape delay (a limitation imposed by prometheus). My fix would be to move from using the prometheus scraper in my 
 detection stack to InfluxDB which facilitates the storing of fine grained sub second telemetry readings, suiting this project more closely. Allowing for 
 faster sampling rates, quicker detections (faster gathering of 20 anomalies to trigger the investigation) and less likelihood of these collected anomalous measurements
-from being poisoned by background system activity due to a shorted time period required to collect all 20 required anomalies.
+from being poisoned by background system activity due to a shorter time period required to collect all 20 anomalies.
 
 \newpage
 \begin{thebibliography}{9}
@@ -646,7 +649,7 @@ L3 Cache (LLC)       & 12 MB         & 24-way                 & 12288         & 
 15 & Yes & Detected & 0.00698 & 30 & Yes & Detected & 0.00704 \\ \hline
 \end{tabular}%
 }
-\caption{30 runs of Recorded Performance for Low Noise to Attack}
+\caption{30 runs of Recorded Performance for Low Noise (1 RPM) to Attack}
 \label{tab:cache_attacks_low}
 \end{table}
 
@@ -674,7 +677,7 @@ L3 Cache (LLC)       & 12 MB         & 24-way                 & 12288         & 
 15 & Yes & Detected & 0.00713 & 30 & Yes & Detected & 0.00441 \\ \hline
 \end{tabular}%
 }
-\caption{30 runs of Recorded Performance for Moderate Noise to Attack}
+\caption{30 runs of Recorded Performance for Moderate Noise (30 RPM) to Attack}
 \label{tab:cache_attacks_mod}
 \end{table}
 
@@ -701,7 +704,7 @@ L3 Cache (LLC)       & 12 MB         & 24-way                 & 12288         & 
 15 & Yes & Detected & 0.00910 & 30 & Yes & Detected & 0.00645 \\ \hline
 \end{tabular}%
 }
-\caption{30 runs of Recorded Performance for High Noise to Attack}
+\caption{30 runs of Recorded Performance for High Noise (80 RPM) to Attack}
 \label{tab:cache_attacks_high}
 \end{table}
 
@@ -728,7 +731,7 @@ L3 Cache (LLC)       & 12 MB         & 24-way                 & 12288         & 
 15 & No & N/A & N/A & 30 & No & N/A & N/A \\ \hline
 \end{tabular}%
 }
-\caption{30 runs of Recorded Performance for High Noise to Low Noise}
+\caption{30 runs of Recorded Performance for High Noise (80 RPM) to Low Noise (1 RPM)}
 \label{tab:high_to_low}
 \end{table}
 
@@ -756,7 +759,7 @@ L3 Cache (LLC)       & 12 MB         & 24-way                 & 12288         & 
 15 & Yes & Cleared  & 0.0298 & 30 & Yes & Cleared  & 0.0411 \\ \hline
 \end{tabular}%
 }
-\caption{30 runs of Recorded Performance for Low Noise to High Noise}
+\caption{30 runs of Recorded Performance for Low Noise (1 RPM) to High Noise (80 RPM)}
 \label{tab:low_to_high}
 \end{table}
 

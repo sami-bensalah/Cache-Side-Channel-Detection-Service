@@ -12,7 +12,7 @@
 \citation{arm_architecture}
 \citation{arm_architecture}
 \citation{spectre_og}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {1.1.3}OpenShift Clusters}{2}{subsubsection.1.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {1.1.3}Red Hat OpenShift Container Platform (RHOCP) Clusters}{2}{subsubsection.1.1.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.2}Problem Definition}{2}{subsection.1.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {2}Project Background}{2}{section.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Cache Structure and Mapping}{2}{subsection.2.1}\protected@file@percent }
@@ -31,7 +31,7 @@
 \citation{cloudradar}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.4}PMU and Hardware Counters}{4}{subsection.2.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.5}Red Hat OpenShift Container Platform (RHOCP)}{4}{subsection.2.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3}Reviewing of Existing Solutions Methods}{4}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Reviewing of Existing Solutions}{4}{section.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.1}SCADET - Pre-deployment Static Binary Scanning}{4}{subsection.3.1}\protected@file@percent }
 \citation{spypmu}
 \citation{verizon}
@@ -63,12 +63,12 @@
 \newlabel{lst:spectre}{{1}{9}{\small {Spectre Gadget in victim.c}}{lstlisting.1}{}}
 \@writefile{lol}{\contentsline {lstlisting}{\numberline {1}\small  {Spectre Gadget in victim.c}}{9}{lstlisting.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {5.4.1}Flush+Reload Validation}{9}{subsubsection.5.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Prime+Probe over HTTP Implementation}{9}{subsection.5.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Prime+Probe over HTTP}{9}{subsection.5.5}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {5.5.1}L1 Targeting}{9}{subsubsection.5.5.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {5.5.2}Last Level Cache Targeting}{10}{subsubsection.5.5.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {6}Results - Solution performance}{10}{section.6}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Attack Run Scenarios}{10}{subsection.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Changing Service Load Scenarios}{11}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Changing Service Activity Scenarios}{11}{subsection.6.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Implementation Overhead}{11}{subsection.6.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{11}{section.7}\protected@file@percent }
 \bibcite{kernel_spectre}{1}
@@ -89,14 +89,14 @@
 \newlabel{tab:hardware_specs}{{3}{13}{\small {Lab Environment Hardware Specifications}}{table.3}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Microarchitectural cache specifications of the lab cluster node.}}{13}{table.4}\protected@file@percent }
 \newlabel{tab:cache_specs_grid}{{4}{13}{Microarchitectural cache specifications of the lab cluster node}{table.4}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces 30 runs of Recorded Performance for Low Noise to Attack}}{13}{table.5}\protected@file@percent }
-\newlabel{tab:cache_attacks_low}{{5}{13}{30 runs of Recorded Performance for Low Noise to Attack}{table.5}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces 30 runs of Recorded Performance for Moderate Noise to Attack}}{14}{table.6}\protected@file@percent }
-\newlabel{tab:cache_attacks_mod}{{6}{14}{30 runs of Recorded Performance for Moderate Noise to Attack}{table.6}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces 30 runs of Recorded Performance for High Noise to Attack}}{14}{table.7}\protected@file@percent }
-\newlabel{tab:cache_attacks_high}{{7}{14}{30 runs of Recorded Performance for High Noise to Attack}{table.7}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces 30 runs of Recorded Performance for High Noise to Low Noise}}{15}{table.8}\protected@file@percent }
-\newlabel{tab:high_to_low}{{8}{15}{30 runs of Recorded Performance for High Noise to Low Noise}{table.8}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces 30 runs of Recorded Performance for Low Noise to High Noise}}{15}{table.9}\protected@file@percent }
-\newlabel{tab:low_to_high}{{9}{15}{30 runs of Recorded Performance for Low Noise to High Noise}{table.9}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces 30 runs of Recorded Performance for Low Noise (1 RPM) to Attack}}{13}{table.5}\protected@file@percent }
+\newlabel{tab:cache_attacks_low}{{5}{13}{30 runs of Recorded Performance for Low Noise (1 RPM) to Attack}{table.5}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces 30 runs of Recorded Performance for Moderate Noise (30 RPM) to Attack}}{14}{table.6}\protected@file@percent }
+\newlabel{tab:cache_attacks_mod}{{6}{14}{30 runs of Recorded Performance for Moderate Noise (30 RPM) to Attack}{table.6}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces 30 runs of Recorded Performance for High Noise (80 RPM) to Attack}}{14}{table.7}\protected@file@percent }
+\newlabel{tab:cache_attacks_high}{{7}{14}{30 runs of Recorded Performance for High Noise (80 RPM) to Attack}{table.7}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces 30 runs of Recorded Performance for High Noise (80 RPM) to Low Noise (1 RPM)}}{15}{table.8}\protected@file@percent }
+\newlabel{tab:high_to_low}{{8}{15}{30 runs of Recorded Performance for High Noise (80 RPM) to Low Noise (1 RPM)}{table.8}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces 30 runs of Recorded Performance for Low Noise (1 RPM) to High Noise (80 RPM)}}{15}{table.9}\protected@file@percent }
+\newlabel{tab:low_to_high}{{9}{15}{30 runs of Recorded Performance for Low Noise (1 RPM) to High Noise (80 RPM)}{table.9}{}}
 \gdef \@abspage@last{15}
