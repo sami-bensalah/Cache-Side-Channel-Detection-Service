@@ -148,3 +148,42 @@ oc get routes -n collector
 
 It will look something like 'prometheus-collector.apps-crc.testing', enter this into your browser to access the prometheus web app and view live metrics
 
+### Understanding Detector Logs
+In all logs the associated [PID XXXX] is printed alongside the log title to identify the process/container that the action was carried out on.
+
+All metric measurements for a process are signalled by [CACHE INFO] and the measured LLC Misses and References are printed
+```bash 
+# standard measurement log example
+[CACHE INFO][PID 9206] Misses: 31985 | References: 127475
+```
+
+If an anomaly is detected by the PID's regression model the [ANOMALY DETECTED] log is printed immediately following the metric measurement [CACHE INFO] log. The pod in which the container process is running is also printed.
+```bash
+# anomalous measurement detected example
+[ANOMALY DETECTED][PID 9206] Possibly Dangerous Cache Behaviour | POD: example-pod
+```
+
+If 20 anomalies are collected, the threshold comparison check is run and the anomalies' standard deviation is outputted:
+```bash
+# output of calculated StDev example
+[INFO][PID 9206] Anomolous measurements' standard deviation: 0.007073511906022402 | POD: example-pod
+```
+
+If an anomaly is cleared from attack suspection, the [CLEARED] log is printed
+```bash
+# attack clearance example
+[CLEARED][PID 9206] Investigated signal was not an attack | POD: example-pod-b558774fc-6x4lg
+```
+
+If an attack is detected by the system the 
+```bash
+# attack detected example
+[ATTACK DETECTED][PID 9206] Severe Cache Side Channel Attack Detected | POD: example-pod
+```
+
+When a model is rebuilt on new data the [MODEL INFO] log is outputted. It details the standard deviation of the models training set, model fit and the pod
+associated with the process the model was calculated for.
+```bash
+# Model refresh example
+[MODEL INFO][PID 9206] Model Accuracy: 0.8229 | StdDev: 11075.128347416454 | POD: example-pod
+```
