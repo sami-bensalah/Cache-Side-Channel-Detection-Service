@@ -187,3 +187,75 @@ associated with the process the model was calculated for.
 # Model refresh example
 [MODEL INFO][PID 9206] Model Accuracy: 0.8229 | StdDev: 11075.128347416454 | POD: example-pod
 ```
+
+Full Log Example (when attack is occurring):
+```bash
+[MODEL INFO][PID 9206] Model Accuracy: 0.9519 | StdDev: 3869.0171826087867 | POD: hello-node-b558774fc-6x4lg
+[MODEL INFO][PID 15273] Model Accuracy: 0.7618 | StdDev: 12953.516504821306 | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 80674 | References: 237072
+[CACHE INFO][PID 15273] Misses: 70073 | References: 210826
+[CACHE INFO][PID 15273] Misses: 99637 | References: 239306
+[CACHE INFO][PID 15273] Misses: 98897 | References: 252873
+[CACHE INFO][PID 15273] Misses: 86253 | References: 217084
+[CACHE INFO][PID 9206] Misses: 12207 | References: 36287
+[CACHE INFO][PID 15273] Misses: 88592 | References: 233882
+[CACHE INFO][PID 15273] Misses: 84682 | References: 221858
+[CACHE INFO][PID 15273] Misses: 83866 | References: 245035
+[CACHE INFO][PID 9206] Misses: 97732 | References: 190456
+[ANOMALY DETECTED][PID 9206] Possibly Dangerous Cache Behaviour | POD: hello-node-b558774fc-6x4lg
+[CACHE INFO][PID 15273] Misses: 97596 | References: 257854
+[CACHE INFO][PID 15273] Misses: 78393 | References: 211660
+[CACHE INFO][PID 15273] Misses: 113836 | References: 280298
+[CACHE INFO][PID 15273] Misses: 84918 | References: 223387
+[CACHE INFO][PID 15273] Misses: 101252 | References: 245762
+[CACHE INFO][PID 9206] Misses: 9410 | References: 27704
+[CACHE INFO][PID 15273] Misses: 77572 | References: 217707
+[CACHE INFO][PID 15273] Misses: 108434 | References: 302606
+[CACHE INFO][PID 15273] Misses: 116691 | References: 307956
+[CACHE INFO][PID 15273] Misses: 67114 | References: 1159656
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 9206] Misses: 7653 | References: 35132
+[CACHE INFO][PID 15273] Misses: 665112 | References: 11911512
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 827077 | References: 12396528
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 687236 | References: 12183071
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 685162 | References: 11802241
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 667296 | References: 10701446
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 755567 | References: 12593628
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 603404 | References: 11427704
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 9206] Misses: 4058 | References: 14705
+[CACHE INFO][PID 15273] Misses: 746156 | References: 13291393
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 747106 | References: 12305698
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 637539 | References: 11071819
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 656214 | References: 12301267
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 9206] Misses: 9818 | References: 35091
+[CACHE INFO][PID 15273] Misses: 773444 | References: 12992755
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 729840 | References: 12895807
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 780864 | References: 12705857
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 817381 | References: 12452761
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 780220 | References: 11817141
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 781485 | References: 12009119
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 15273] Misses: 834653 | References: 9761723
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[CACHE INFO][PID 9206] Misses: 9546 | References: 28169
+[CACHE INFO][PID 15273] Misses: 735982 | References: 12396467
+[ANOMALY DETECTED][PID 15273] Possibly Dangerous Cache Behaviour | POD: spectre-victim-68d48f9c-55hkp
+[INFO][PID 15273] Anomolous measurements' standard deviation: 0.007073511906022402 | POD: spectre-victim-68d48f9c-55hkp
+[ATTACK DETECTED][PID 15273] Severe Cache Side Channel Attack Detected | POD: spectre-victim-68d48f9c-55hkp
+```
