@@ -1,4 +1,4 @@
-# Multi-Tenant RHOCP Side-Channel Detector
+# A Detector for Cache Side-Channel Attacks in Multi-tenant OpenShift Environments
 
 A lightweight, container-native telemetry and detection system designed to intercept Last-Level Cache (LLC) Prime+Probe side-channel attacks (leveraging vulnerabilities like Spectre V1) on Red Hat OpenShift Container Platform (RHOCP).
 
