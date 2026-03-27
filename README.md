@@ -19,9 +19,6 @@ The system consists of two primary components deployed within a single administr
 
 ---
 
-## Project Repo Structure
-
-
 ## Deployment & Execution Run-Book
 Install OpenShift Local v4.19.8 (from https://console.redhat.com/openshift/create/local), start the cluster and login as an admin
 
@@ -69,24 +66,19 @@ podman unshare skopeo copy \
 Set up the monitoring namespace, Prometheus time-series DB, and the Python collector/detector.
 
 ```bash
-# 1. Install OpenShift Local v4.19.8 from [https://console.redhat.com/openshift/create/local](https://console.redhat.com/openshift/create/local)
-
-# 2. Create the detection namespace
-oc new-project collector
-
-# 3. Create Service Account and bind Privileged SCC (Required for hardware perf metrics)
+# 1. Create Service Account and bind Privileged SCC (Required for hardware perf metrics)
 oc create sa collector-sa -n collector
 oc adm policy add-scc-to-user privileged -z collector-sa -n collector
 
-# 4. Create ConfigMaps FIRST (so deployments don't crash loop on mount)
+# 2. Create ConfigMaps
 oc create cm prom-config --from-file=detector/config-files/prometheus.yml -n collector
 oc create cm perf-config --from-file=detector/config-files/perf-config -n collector
 
-# 5. Create Deployments
+# 3. Create Deployments
 oc create -f detector/config-files/collector.yaml -n collector
 oc create -f detector/config-files/prom-deployment.yaml -n collector
 
-# 6. Expose internal services
+# 4. Expose internal services
 oc expose deployment/perf-collector --port 8000 --name perf-collector-svc -n collector
 oc expose deployment/prometheus --port 9090 -n collector
 ```
@@ -95,20 +87,17 @@ oc expose deployment/prometheus --port 9090 -n collector
 Deploy the vulnerable HTTP session-token server.
 
 ```bash
-# 1. Create victim namespace
-oc new-project spectre-victim
-
-# 2. Create Service Account and bind Privileged SCC
+# 1. Create Service Account and bind Privileged SCC
 oc create sa spectre-victim-sa -n spectre-victim
 oc adm policy add-scc-to-user privileged -z spectre-victim-sa -n spectre-victim
 
-# 3. Allocate Hugepages on the CRC bare-metal node (Required for cache probes)
+# 2. Allocate Hugepages on the CRC bare-metal node (Required for cache probes)
 oc debug node/crc -- chroot /host sh -c "sudo sysctl -w vm.nr_hugepages=6 && sudo systemctl restart kubelet"
 
-# 4. Deploy the victim server
+# 3. Deploy the victim server
 oc create -f spectre-victim.yaml -n spectre-victim
 
-# 5. Port-forward the victim pod to your local loopback to execute the HTTP attack
+# 4. Port-forward the victim pod to your local loopback to execute the HTTP attack
 # (Find your pod name using: oc get pods -n spectre-victim)
 oc port-forward pod/<victim-pod-name> 8080:8080 -n spectre-victim
 ```
