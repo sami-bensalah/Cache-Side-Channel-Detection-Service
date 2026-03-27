@@ -2,7 +2,7 @@
 
 A lightweight, container-native telemetry and detection system designed to intercept Last-Level Cache (LLC) Prime+Probe side-channel attacks (leveraging vulnerabilities like Spectre V1) on Red Hat OpenShift Container Platform (RHOCP).
 
-The system uses Linux `perf` to scrape hardware Performance Monitoring Unit (PMU) metrics at the application/pod level and analyzes them using Multivariate Linear Regression without intercepting tenant data.
+The system uses Linux `perf` to scrape hardware Performance Monitoring Unit (PMU) metrics at the application/pod level and analyses them using a Multivariate Linear Regression model.
 
 ---
 
