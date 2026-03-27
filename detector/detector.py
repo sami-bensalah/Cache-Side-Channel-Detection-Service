@@ -25,10 +25,18 @@ def get_model_data(pid):
 
 def build_model(pid, pod_name):
     metric_data = get_model_data(pid)
+    
+    min_len = min(len(v) for v in metric_data.values())
+    
+    # truncate for all same len
+    refs = metric_data["llc_cache_references"][:min_len]
+    ipc = metric_data["instructions_per_cycle"][:min_len]
+    branch = metric_data["llc_branch_ratio"][:min_len]
+    misses = metric_data["llc_cache_misses"][:min_len]
 
     # zip metrics together to create points [a, b, c] -> [refs, ipc, branch_ratio]
-    X = list(zip(metric_data["llc_cache_references"], metric_data["instructions_per_cycle"], metric_data["llc_branch_ratio"]))
-    y = metric_data["llc_cache_misses"] 
+    X = list(zip(refs, ipc, branch))
+    y = misses
     
     model = LinearRegression().fit(X, y) # build model
     

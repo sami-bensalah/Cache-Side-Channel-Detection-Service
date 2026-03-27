@@ -22,8 +22,8 @@
 #define PAGE_SIZE 4096
 
 // prime+probe
-#define ATTACK_RUNS 100
-#define EVICTION_THRESHOLD 400
+#define ATTACK_RUNS 100000
+#define EVICTION_THRESHOLD 140
 
 // socket
 #define PORT 8080
@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
     "Content-Type: application/x-www-form-urlencoded\r\n"
     "Connection: keep-alive\r\n"
     "\r\n"
-    "username=none&password=none&id=4132";
+    "username=none&password=none&id=0000";
     char attack_data[256];
     get_inputs(attack_data, argc, argv);
     

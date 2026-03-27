@@ -136,7 +136,7 @@ def collect_detect(pid, minute):
                 # if more than 20 anomalous recordings calc stdev and check consistency
                 stdev = statistics.stdev(pid_anomalies[pid])
                 print(f"[INFO][PID {pid}] Anomolous measurements's standard deviation: {stdev} | POD: {pid_pod_name[pid]}")
-                if float(stdev) < 0.01:
+                if float(stdev) < 0.015:
                     print(f"[ATTACK DETECTED][PID {pid}] Severe Cache Side Channel Attack Detected | POD: {pid_pod_name[pid]}", flush=True)
                     os._exit(1)
                 else:
